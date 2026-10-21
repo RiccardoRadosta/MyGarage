@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { MaintenanceRecord, User, Vehicle } from '../types';
 import { ApiCostsSummary } from '../services/api/contracts';
 import { ApiError, apiClient } from '../services/api/ApiClient';
@@ -40,6 +40,7 @@ type AppContextType = {
   addMaintenance: (record: Omit<MaintenanceRecord, 'id'>) => Promise<MaintenanceRecord>;
   updateMaintenance: (record: MaintenanceRecord) => Promise<void>;
   deleteMaintenance: (maintenanceId: string) => Promise<void>;
+  setMaintenanceAttachmentState: (maintenanceId: string, hasAttachment: boolean) => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -261,7 +262,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         record.id,
         toApiMaintenancePayload(record),
       ));
-      setMaintenanceRecords((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setMaintenanceRecords((current) =>
+        current.map((item) =>
+          item.id === updated.id
+            ? {
+                ...item,
+                ...updated,
+                hasAttachment: updated.hasAttachment !== undefined ? updated.hasAttachment : item.hasAttachment,
+              }
+            : item,
+        ),
+      );
       setVehicles((current) => current.map((vehicle) =>
         vehicle.id === updated.vehicleId && updated.mileage > vehicle.mileage
           ? { ...vehicle, mileage: updated.mileage }
@@ -280,6 +291,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ),
     );
   };
+
+  const setMaintenanceAttachmentState = useCallback((maintenanceId: string, hasAttachment: boolean) => {
+    setMaintenanceRecords((current) => {
+      const target = current.find((item) => item.id === maintenanceId);
+      if (!target || target.hasAttachment === hasAttachment) {
+        return current;
+      }
+      return current.map((item) => (item.id === maintenanceId ? { ...item, hasAttachment } : item));
+    });
+  }, []);
 
   const deleteMaintenance = async (maintenanceId: string) => {
     if (apiClient.isConfigured) await maintenancesApi.delete(maintenanceId);
@@ -307,8 +328,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addMaintenance,
       updateMaintenance,
       deleteMaintenance,
+      setMaintenanceAttachmentState,
     }),
-    [user, isAuthenticated, isInitializing, vehicles, maintenanceRecords, costSummary],
+    [user, isAuthenticated, isInitializing, vehicles, maintenanceRecords, costSummary, setMaintenanceAttachmentState],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

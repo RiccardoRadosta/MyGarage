@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { CalendarDays, Gauge, Wrench } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, Gauge, Paperclip, Wrench } from 'lucide-react-native';
 import { AppColors, appRadius, appSpacing } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
 import { MaintenanceRecord } from '../../types';
@@ -31,9 +31,18 @@ export const MaintenanceItem: React.FC<MaintenanceItemProps> = ({ record, onPres
             <Gauge size={13} color={colors.muted} />
             <Text style={styles.metaText}>{formatMileage(record.mileage)}</Text>
           </View>
+          {record.hasAttachment ? (
+            <View style={styles.metaItem}>
+              <Paperclip size={12} color={colors.primary} />
+              <Text style={[styles.metaText, { color: colors.primary, fontWeight: '600' }]}>Allegato</Text>
+            </View>
+          ) : null}
         </View>
       </View>
-      <Text style={styles.amount}>{formatCurrency(record.cost)}</Text>
+      <View style={styles.rightGroup}>
+        <Text style={styles.amount}>{formatCurrency(record.cost)}</Text>
+        <ChevronRight size={16} color={colors.muted} />
+      </View>
     </Pressable>
   );
 };
@@ -55,7 +64,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   iconWrap: {
     alignItems: 'center',
-      backgroundColor: colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: appRadius.sm,
     height: 36,
     justifyContent: 'center',
@@ -70,6 +79,11 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
     fontFamily: 'Manrope_700Bold',
+  },
+  rightGroup: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   amount: {
     fontSize: 13,

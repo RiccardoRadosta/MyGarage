@@ -46,6 +46,7 @@ export type ApiMaintenanceSummary = {
   date: string;
   mileage: number;
   cost: number;
+  hasAttachment?: boolean;
 };
 
 export type ApiVehicle = ApiVehicleSummary & {
@@ -57,6 +58,17 @@ export type ApiMaintenance = ApiMaintenanceSummary & {
   vehicleId: string;
   customDescription: string | null;
   notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  hasAttachment?: boolean;
+};
+
+export type ApiAttachmentMetadata = {
+  id: string;
+  maintenanceId: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
   createdAt: string;
   updatedAt: string;
 };

@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScreenShell } from '../../components/common/ScreenShell';
 import { ActionButton } from '../../components/common/ActionButton';
 import { ScreenContextHeader } from '../../components/common/ScreenContextHeader';
 import { AppDialog, AppDialogOptions } from '../../components/common/AppDialog';
+import { AttachmentSection } from '../../components/maintenance/AttachmentSection';
 import { useApp } from '../../store/AppContext';
 import { AppColors, appRadius, appSpacing } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
@@ -17,7 +18,7 @@ export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) 
   const { maintenanceRecords, deleteMaintenance } = useApp();
   const colors = useAppColors();
   const styles = createStyles(colors);
-  const [dialog, setDialog] = React.useState<AppDialogOptions | null>(null);
+  const [dialog, setDialog] = useState<AppDialogOptions | null>(null);
   const record = maintenanceRecords.find((item) => item.id === maintenanceId);
 
   if (!record) {
@@ -63,8 +64,24 @@ export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) 
         {record.customDescription ? <DetailRow label="Descrizione" value={record.customDescription} /> : null}
       </View>
 
-      <ActionButton title="Modifica" variant="secondary" onPress={() => navigation.navigate('MaintenanceForm', { vehicleId: record.vehicleId, maintenanceId: record.id, mode: 'edit' })} style={styles.button} />
-      <ActionButton title="Elimina intervento" variant="danger" onPress={handleDelete} style={styles.button} />
+      <AttachmentSection
+        maintenanceId={record.id}
+        hasAttachmentInitial={record.hasAttachment}
+        readOnly
+      />
+
+      <ActionButton
+        title="Modifica"
+        variant="secondary"
+        onPress={() => navigation.navigate('MaintenanceForm', { vehicleId: record.vehicleId, maintenanceId: record.id, mode: 'edit' })}
+        style={styles.button}
+      />
+      <ActionButton
+        title="Elimina intervento"
+        variant="danger"
+        onPress={handleDelete}
+        style={styles.button}
+      />
       <AppDialog
         visible={dialog !== null}
         title={dialog?.title ?? ''}
@@ -99,24 +116,29 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.card,
-    borderRadius: appRadius.lg,
-    padding: appSpacing.md,
+    borderRadius: appRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: appSpacing.lg,
     marginBottom: appSpacing.md,
   },
   row: {
-    paddingVertical: appSpacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   label: {
     color: colors.muted,
-    fontSize: 12,
-    marginBottom: 4,
+    fontSize: 16,
   },
   value: {
     color: colors.text,
     fontSize: 16,
     fontWeight: '600',
+    maxWidth: '60%',
+    textAlign: 'right',
   },
   button: {
     marginBottom: appSpacing.sm,

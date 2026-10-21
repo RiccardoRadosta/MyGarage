@@ -1,5 +1,8 @@
-import { apiClient } from './ApiClient';
+import { Platform } from 'react-native';
+import { File as ExpoFile } from 'expo-file-system';
+import { ApiError, apiClient } from './ApiClient';
 import {
+  ApiAttachmentMetadata,
   ApiCostsSummary,
   ApiDashboard,
   ApiMaintenance,
@@ -148,3 +151,109 @@ export const costsApi = {
   summary: (year = new Date().getFullYear()) =>
     apiClient.request<ApiCostsSummary>(`/api/v1/costs/summary?year=${year}`),
 };
+
+export type AttachmentUploadFile = {
+  uri: string;
+  name: string;
+  type: string;
+  webFile?: Blob;
+};
+
+export type UploadFileInput = AttachmentUploadFile;
+
+export const attachmentsApi = {
+  metadata: async (maintenanceId: string): Promise<ApiAttachmentMetadata | null> => {
+    try {
+      return await apiClient.request<ApiAttachmentMetadata>(
+        `/api/v1/maintenances/${encodeURIComponent(maintenanceId)}/attachment`,
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  get: async (maintenanceId: string): Promise<ApiAttachmentMetadata | null> => {
+    return attachmentsApi.metadata(maintenanceId);
+  },
+
+  upload: async (maintenanceId: string, file: AttachmentUploadFile) => {
+    const path = `/api/v1/maintenances/${encodeURIComponent(maintenanceId)}/attachment`;
+    if (__DEV__) {
+      console.info('[Allegati upload] avvio', {
+        method: 'PUT',
+        path,
+        maintenanceId,
+        filePresent: Boolean(file.uri),
+        uriScheme: file.uri.split(':', 1)[0],
+        mimeType: file.type,
+        fileSizeBytes: 'size' in file ? file.size : undefined,
+        multipartField: 'file',
+      });
+    }
+
+    const formData = new FormData();
+    try {
+      if (Platform.OS === 'web' && file.webFile) {
+        formData.append('file', file.webFile, file.name);
+      } else if (Platform.OS === 'web') {
+        const response = await fetch(file.uri);
+        if (!response.ok) throw new Error(`Lettura del file non riuscita (${response.status}).`);
+        const blob = await response.blob();
+        formData.append('file', blob, file.name);
+      } else {
+        const localFile = new ExpoFile(file.uri);
+        // Expo SDK 57's native fetch serializes multipart entries through its
+        // WinterCG converter, which requires file parts to expose bytes().
+        // React Native's { uri, name, type } part is rejected by that converter.
+        formData.append('file', {
+          bytes: () => localFile.bytes(),
+          name: file.name,
+          type: file.type,
+        } as unknown as Blob);
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.error('[Allegati upload] preparazione multipart non riuscita', {
+          maintenanceId,
+          mimeType: file.type,
+          uriScheme: file.uri.split(':', 1)[0],
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      }
+      throw error;
+    }
+
+    return apiClient.request<ApiAttachmentMetadata>(path, {
+      method: 'PUT',
+      body: formData,
+    });
+  },
+
+  remove: (maintenanceId: string) =>
+    apiClient.request<void>(
+      `/api/v1/maintenances/${encodeURIComponent(maintenanceId)}/attachment`,
+      { method: 'DELETE' },
+    ),
+
+  delete: (maintenanceId: string) =>
+    apiClient.request<void>(
+      `/api/v1/maintenances/${encodeURIComponent(maintenanceId)}/attachment`,
+      { method: 'DELETE' },
+    ),
+
+  content: async (maintenanceId: string) => {
+    const path = `/api/v1/maintenances/${encodeURIComponent(maintenanceId)}/attachment/content`;
+    return apiClient.requestBinary(path);
+  },
+
+  getContentUrl: (maintenanceId: string) => {
+    const base = apiClient.getBaseUrl();
+    return `${base}/api/v1/maintenances/${encodeURIComponent(maintenanceId)}/attachment/content`;
+  },
+};
+
+export const attachmentApi = attachmentsApi;

@@ -26,5 +26,15 @@ export type MaintenanceRecord = {
   cost: number;
   notes?: string;
   customDescription?: string;
+  hasAttachment?: boolean;
 };
 
+export type AttachmentMetadata = {
+  id: string;
+  maintenanceId: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+  createdAt: string;
+  updatedAt: string;
+};

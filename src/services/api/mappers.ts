@@ -60,4 +60,5 @@ export const fromApiMaintenance = (record: ApiMaintenance): MaintenanceRecord =>
   cost: record.cost,
   notes: record.notes ?? undefined,
   customDescription: record.customDescription ?? undefined,
+  hasAttachment: record.hasAttachment,
 });

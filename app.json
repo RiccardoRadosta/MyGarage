@@ -24,7 +24,16 @@
     "plugins": [
       "expo-font",
       "@react-native-community/datetimepicker",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Consenti a Il Mio Garage di scattare foto delle fatture e degli interventi.",
+          "photosPermission": "Consenti a Il Mio Garage di scegliere foto da allegare agli interventi.",
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }

@@ -20,6 +20,19 @@ export class ApiError extends Error {
 
 const configuredBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, '');
 
+const safeUrlForDiagnostics = (value: string) => {
+  try {
+    const url = new URL(value);
+    url.username = '';
+    url.password = '';
+    url.search = '';
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return '[URL non valida]';
+  }
+};
+
 export class ApiClient {
   private webAccessToken: string | null = null;
   private webRefreshToken: string | null = null;
@@ -28,6 +41,10 @@ export class ApiClient {
 
   get isConfigured() {
     return Boolean(this.baseUrl);
+  }
+
+  getBaseUrl() {
+    return this.baseUrl;
   }
 
   async setTokens(accessToken: string, refreshToken: string) {
@@ -72,14 +89,26 @@ export class ApiClient {
     return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
   }
 
+  async getAuthorizationHeader() {
+    const token = await this.getAccessToken();
+    return token ? `Bearer ${token}` : null;
+  }
+
   async request<T>(path: string, options: RequestInit = {}, authenticated = true, retryAfterRefresh = true): Promise<T> {
     if (!this.baseUrl) {
       throw new ApiError('API non configurata: imposta EXPO_PUBLIC_API_URL.', 0, 'API_NOT_CONFIGURED');
     }
 
     const headers = new Headers(options.headers);
-    headers.set('Accept', 'application/json');
-    if (options.body && !headers.has('Content-Type')) {
+    const method = (options.method ?? 'GET').toUpperCase();
+    const url = `${this.baseUrl}${path}`;
+    const isAttachmentRequest = path.includes('/attachment');
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'application/json');
+    }
+
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+    if (options.body && !isFormData && !headers.has('Content-Type')) {
       headers.set('Content-Type', 'application/json');
     }
 
@@ -88,16 +117,40 @@ export class ApiClient {
       if (token) headers.set('Authorization', `Bearer ${token}`);
     }
 
+    if (__DEV__ && isAttachmentRequest) {
+      console.info('[Allegati API] richiesta', {
+        method,
+        url: safeUrlForDiagnostics(url),
+        hasBearerToken: headers.has('Authorization'),
+        isFormData,
+        contentTypeHeader: headers.get('Content-Type'),
+      });
+    }
+
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}${path}`, { ...options, headers });
-    } catch {
+      response = await fetch(url, { ...options, headers });
+    } catch (error) {
+      if (__DEV__ && isAttachmentRequest) {
+        console.error('[Allegati API] errore di rete', {
+          method,
+          url: safeUrlForDiagnostics(url),
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      }
       throw new ApiError('Impossibile raggiungere il server. Controlla connessione e URL API.', 0, 'NETWORK_ERROR');
     }
 
-    if (response.status === 401 && authenticated && retryAfterRefresh && path !== '/api/v1/auth/logout') {
-      const refreshed = await this.refreshAccessToken();
-      if (refreshed) return this.request<T>(path, options, authenticated, false);
+    if (__DEV__ && isAttachmentRequest) {
+      console.info('[Allegati API] risposta', { method, url: safeUrlForDiagnostics(url), status: response.status });
+    }
+
+    if (response.status === 401 && authenticated && path !== '/api/v1/auth/logout') {
+      if (retryAfterRefresh) {
+        const refreshed = await this.refreshAccessToken();
+        if (refreshed) return this.request<T>(path, options, authenticated, false);
+      }
       await this.clearTokens();
     }
 
@@ -106,6 +159,17 @@ export class ApiClient {
     const responseBody: unknown = await response.json().catch(() => undefined);
     if (!response.ok) {
       const problem = responseBody as ApiProblem | undefined;
+      const isExpected404 = isAttachmentRequest && method === 'GET' && response.status === 404;
+      if (__DEV__ && isAttachmentRequest && !isExpected404) {
+        console.warn('[Allegati API] risposta HTTP non riuscita', {
+          method,
+          url: safeUrlForDiagnostics(url),
+          status: response.status,
+          message: problem?.detail ?? problem?.title ?? `Richiesta non riuscita (${response.status}).`,
+        });
+      } else if (__DEV__ && isExpected404) {
+        console.info('[Allegati API] nessun allegato presente per questo intervento (404)');
+      }
       throw new ApiError(
         problem?.detail ?? problem?.title ?? `Richiesta non riuscita (${response.status}).`,
         response.status,
@@ -115,6 +179,78 @@ export class ApiClient {
     }
 
     return responseBody as T;
+  }
+
+  async requestBinary(path: string, retryAfterRefresh = true): Promise<{ bytes: Uint8Array; contentType: string }> {
+    if (!this.baseUrl) {
+      throw new ApiError('API non configurata: imposta EXPO_PUBLIC_API_URL.', 0, 'API_NOT_CONFIGURED');
+    }
+
+    const url = `${this.baseUrl}${path}`;
+    const headers = new Headers({ Accept: 'application/pdf, image/jpeg, application/octet-stream' });
+    const token = await this.getAccessToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+
+    if (__DEV__) {
+      console.info('[Allegati API] richiesta binaria', {
+        method: 'GET',
+        url: safeUrlForDiagnostics(url),
+        hasBearerToken: Boolean(token),
+      });
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url, { headers });
+    } catch (error) {
+      if (__DEV__) {
+        console.error('[Allegati API] errore di rete richiesta binaria', {
+          url: safeUrlForDiagnostics(url),
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      }
+      throw new ApiError('Impossibile raggiungere il server. Controlla connessione e URL API.', 0, 'NETWORK_ERROR');
+    }
+
+    const rawContentType = response.headers.get('Content-Type') || response.headers.get('content-type') || 'application/octet-stream';
+    const rawContentLength = response.headers.get('Content-Length') || response.headers.get('content-length');
+
+    if (__DEV__) {
+      console.info('[Allegati API] risposta binaria', {
+        method: 'GET',
+        url: safeUrlForDiagnostics(url),
+        status: response.status,
+        contentTypeHeader: rawContentType,
+        contentLengthHeader: rawContentLength,
+      });
+    }
+
+    if (response.status === 401) {
+      if (retryAfterRefresh) {
+        const refreshed = await this.refreshAccessToken();
+        if (refreshed) return this.requestBinary(path, false);
+      }
+      await this.clearTokens();
+    }
+
+    if (!response.ok) {
+      const problem = await response.json().catch(() => undefined) as ApiProblem | undefined;
+      throw new ApiError(
+        problem?.detail ?? problem?.title ?? `Richiesta non riuscita (${response.status}).`,
+        response.status,
+        problem?.code,
+        problem?.fieldErrors,
+      );
+    }
+
+    const contentType = rawContentType.split(';')[0].trim();
+    const arrayBuffer = await response.arrayBuffer();
+
+    return {
+      bytes: new Uint8Array(arrayBuffer),
+      contentType,
+    };
   }
 
   private async getAccessToken() {
