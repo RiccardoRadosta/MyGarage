@@ -1016,7 +1016,7 @@ const createStyles = (colors: AppColors) =>
     /* Bottom Sheet Selezione Tipologia */
     sheetBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(10, 20, 14, 0.55)',
+      backgroundColor: 'rgba(15, 23, 35, 0.55)',
       justifyContent: 'flex-end',
     },
     sheetCard: {
@@ -1202,7 +1202,7 @@ const createStyles = (colors: AppColors) =>
       width: '100%',
     },
     modalBackdrop: {
-      backgroundColor: 'rgba(10, 20, 14, 0.45)',
+      backgroundColor: 'rgba(15, 23, 35, 0.45)',
       flex: 1,
       justifyContent: 'flex-end',
     },

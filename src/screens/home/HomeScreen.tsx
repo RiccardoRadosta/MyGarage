@@ -181,7 +181,7 @@ const createStyles = (colors: AppColors) =>
       backgroundColor: colors.primaryDark,
       borderRadius: appRadius.lg,
       borderWidth: 1,
-      borderColor: 'rgba(215, 237, 121, 0.16)',
+      borderColor: `${colors.accent}2E`,
       flexDirection: 'row',
       gap: appSpacing.md,
       marginBottom: appSpacing.lg,
@@ -190,7 +190,7 @@ const createStyles = (colors: AppColors) =>
     },
     costIcon: {
       alignItems: 'center',
-      backgroundColor: 'rgba(215, 237, 121, 0.15)',
+      backgroundColor: `${colors.accent}26`,
       borderRadius: appRadius.md,
       height: 44,
       justifyContent: 'center',

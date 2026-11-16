@@ -2,6 +2,8 @@ export type AppColors = {
   primary: string;
   primaryDark: string;
   primarySoft: string;
+  secondary: string;
+  accentLight: string;
   accent: string;
   success: string;
   warning: string;
@@ -17,39 +19,43 @@ export type AppColors = {
 };
 
 export const appColors: AppColors = {
-  primary: '#176B50',
-  primaryDark: '#104C3A',
-  primarySoft: '#E7F1EB',
-  accent: '#D7ED79',
-  success: '#247A59',
+  primary: '#1677C8',
+  primaryDark: '#1263A6',
+  primarySoft: '#EAF5FD',
+  secondary: '#3199E0',
+  accentLight: '#75BCEB',
+  accent: '#75BCEB',
+  success: '#15803D',
   warning: '#B76A2E',
   danger: '#B64444',
   dangerStrong: '#C62832',
-  background: '#F4F6F3',
+  background: '#F5F8FC',
   white: '#FFFFFF',
   card: '#FFFFFF',
-  text: '#17221C',
-  muted: '#6B7770',
-  border: '#E1E7E1',
-  shadow: 'rgba(25, 44, 34, 0.06)',
+  text: '#172337',
+  muted: '#687586',
+  border: '#DFE8F1',
+  shadow: 'rgba(23, 35, 55, 0.06)',
 };
 
 export const darkAppColors: AppColors = {
-  primary: '#83CBA5',
-  primaryDark: '#203A2D',
-  primarySoft: '#263B30',
-  accent: '#D7ED79',
-  success: '#83CBA5',
+  primary: '#4DA8EC',
+  primaryDark: '#1263A6',
+  primarySoft: '#162C46',
+  secondary: '#3199E0',
+  accentLight: '#75BCEB',
+  accent: '#75BCEB',
+  success: '#34D399',
   warning: '#E3A66F',
   danger: '#E58A82',
   dangerStrong: '#B8323B',
-  background: '#111713',
-  white: '#F1F5F2',
-  card: '#1A231E',
-  text: '#F1F5F2',
-  muted: '#A5B0A9',
-  border: '#303C35',
-  shadow: 'rgba(0, 0, 0, 0.24)',
+  background: '#0D1520',
+  white: '#F1F5F9',
+  card: '#152132',
+  text: '#F1F5F9',
+  muted: '#8FA0B5',
+  border: '#22344B',
+  shadow: 'rgba(0, 0, 0, 0.35)',
 };
 
 export const getAppColors = (isDarkMode: boolean): AppColors =>
@@ -146,14 +152,14 @@ export const appTypography = {
 
 export const appShadows = {
   subtle: {
-    shadowColor: 'rgba(25, 44, 34, 0.08)',
+    shadowColor: 'rgba(23, 35, 55, 0.08)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 2,
   },
   card: {
-    shadowColor: 'rgba(25, 44, 34, 0.10)',
+    shadowColor: 'rgba(23, 35, 55, 0.10)',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,

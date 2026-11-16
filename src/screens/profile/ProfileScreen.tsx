@@ -226,13 +226,13 @@ const createStyles = (colors: AppColors) =>
       flexShrink: 1,
     },
     statusBadge: {
-      backgroundColor: colors.primarySoft,
+      backgroundColor: `${colors.success}18`,
       paddingHorizontal: 7,
       paddingVertical: 2,
       borderRadius: appRadius.full,
     },
     statusBadgeText: {
-      color: colors.primary,
+      color: colors.success,
       fontSize: 10,
       fontWeight: '700',
       fontFamily: 'Manrope_700Bold',

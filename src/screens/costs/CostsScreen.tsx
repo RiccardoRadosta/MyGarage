@@ -480,7 +480,7 @@ const createStyles = (colors: AppColors) =>
       backgroundColor: colors.primaryDark,
       borderRadius: appRadius.lg,
       borderWidth: 1,
-      borderColor: 'rgba(215, 237, 121, 0.16)',
+      borderColor: `${colors.accent}2E`,
       padding: appSpacing.lg,
       marginBottom: appSpacing.lg,
       ...appShadows.card,
@@ -492,7 +492,7 @@ const createStyles = (colors: AppColors) =>
     },
     heroIconWrap: {
       alignItems: 'center',
-      backgroundColor: 'rgba(215, 237, 121, 0.15)',
+      backgroundColor: `${colors.accent}26`,
       borderRadius: appRadius.md,
       height: 46,
       justifyContent: 'center',
@@ -509,7 +509,7 @@ const createStyles = (colors: AppColors) =>
     },
     heroPlateBadge: {
       borderWidth: 1,
-      borderColor: 'rgba(215, 237, 121, 0.3)',
+      borderColor: `${colors.accent}4D`,
       backgroundColor: 'rgba(255, 255, 255, 0.08)',
       paddingHorizontal: 6,
       paddingVertical: 2,

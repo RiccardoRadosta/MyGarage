@@ -219,7 +219,7 @@ const createStyles = (colors: AppColors) =>
       backgroundColor: colors.primaryDark,
       borderRadius: appRadius.lg,
       borderWidth: 1,
-      borderColor: 'rgba(215, 237, 121, 0.16)',
+      borderColor: `${colors.accent}2E`,
       flexDirection: 'row',
       marginBottom: appSpacing.lg,
       padding: appSpacing.md,

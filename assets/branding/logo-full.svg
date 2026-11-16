@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 600" width="2048" height="600">
   <defs>
     <style>
-      800&display=swap');
-      .arch { fill: #104C3A; }
-      .slat { fill: #104C3A; }
-      .car { fill: #D7ED79; }
-      .text-my { font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 800; font-size: 235px; fill: #D7ED79; letter-spacing: -4px; }
-      .text-garage { font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 700; font-size: 235px; fill: #104C3A; letter-spacing: -5px; }
+      @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&amp;display=swap');
+      .arch { fill: #1263A6; }
+      .slat { fill: #1263A6; }
+      .car { fill: #3199E0; }
+      .text-my { font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 800; font-size: 235px; fill: #3199E0; letter-spacing: -4px; }
+      .text-garage { font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 700; font-size: 235px; fill: #1263A6; letter-spacing: -5px; }
     </style>
   </defs>
 

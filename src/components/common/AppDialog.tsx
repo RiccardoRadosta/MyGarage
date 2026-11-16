@@ -72,8 +72,8 @@ export const AppDialog: React.FC<AppDialogProps> = ({
             </Pressable>
           )}
 
-          <View style={[styles.iconWrap, tone === 'danger' && styles.dangerIconWrap]}>
-            <Icon size={22} color={tone === 'danger' ? colors.dangerStrong : colors.primary} />
+          <View style={[styles.iconWrap, tone === 'danger' && styles.dangerIconWrap, tone === 'success' && styles.successIconWrap]}>
+            <Icon size={22} color={tone === 'danger' ? colors.dangerStrong : tone === 'success' ? colors.success : colors.primary} />
           </View>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
@@ -178,6 +178,9 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   dangerIconWrap: {
     backgroundColor: `${colors.dangerStrong}22`,
+  },
+  successIconWrap: {
+    backgroundColor: `${colors.success}1E`,
   },
   title: {
     color: colors.text,
