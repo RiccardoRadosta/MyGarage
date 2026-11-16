@@ -41,6 +41,8 @@ type AppContextType = {
   updateMaintenance: (record: MaintenanceRecord) => Promise<void>;
   deleteMaintenance: (maintenanceId: string) => Promise<void>;
   setMaintenanceAttachmentState: (maintenanceId: string, hasAttachment: boolean) => void;
+  welcomePending: boolean;
+  dismissWelcome: () => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -52,6 +54,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [vehicles, setVehicles] = useState<Vehicle[]>(INITIAL_VEHICLES);
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(INITIAL_RECORDS);
   const [costSummary, setCostSummary] = useState<ApiCostsSummary | null>(null);
+  const [welcomePending, setWelcomePending] = useState(false);
+
+  const dismissWelcome = useCallback(() => {
+    setWelcomePending(false);
+  }, []);
 
   const loadRemoteData = async () => {
     const [remoteVehicles, firstMaintenancePage, remoteCostSummary] = await Promise.all([
@@ -144,6 +151,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const data = await loadRemoteData();
       setUser(fromApiUser(result.user));
       applyRemoteData(data);
+      setWelcomePending(true);
       setIsAuthenticated(true);
       return true;
     }
@@ -153,6 +161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       name: name.trim(),
       email: email.trim(),
     });
+      setWelcomePending(true);
     setIsAuthenticated(true);
     return true;
   };
@@ -165,6 +174,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await apiClient.clearTokens();
       }
     }
+    setWelcomePending(false);
     setIsAuthenticated(false);
     setUser(null);
   };
@@ -329,8 +339,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateMaintenance,
       deleteMaintenance,
       setMaintenanceAttachmentState,
+      welcomePending,
+      dismissWelcome,
     }),
-    [user, isAuthenticated, isInitializing, vehicles, maintenanceRecords, costSummary, setMaintenanceAttachmentState],
+    [user, isAuthenticated, isInitializing, vehicles, maintenanceRecords, costSummary, setMaintenanceAttachmentState, welcomePending, dismissWelcome],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

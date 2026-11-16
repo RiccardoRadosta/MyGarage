@@ -62,6 +62,32 @@ export const authApi = {
       await apiClient.clearTokens();
     }
   },
+
+  async forgotPassword(email: string) {
+    return apiClient.request<{ message?: string } | void>(
+      '/api/v1/auth/forgot-password',
+      {
+        method: 'POST',
+        body: jsonBody({ email: email.trim() }),
+      },
+      false,
+    );
+  },
+
+  async resetPassword(token: string, newPassword: string, confirmPassword: string) {
+    return apiClient.request<{ message?: string } | void>(
+      '/api/v1/auth/reset-password',
+      {
+        method: 'POST',
+        body: jsonBody({
+          token: token.trim(),
+          newPassword,
+          confirmPassword,
+        }),
+      },
+      false,
+    );
+  },
 };
 
 export const usersApi = {

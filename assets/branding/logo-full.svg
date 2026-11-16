@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 600" width="2048" height="600">
+  <defs>
+    <style>
+      800&display=swap');
+      .arch { fill: #104C3A; }
+      .slat { fill: #104C3A; }
+      .car { fill: #D7ED79; }
+      .text-my { font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 800; font-size: 235px; fill: #D7ED79; letter-spacing: -4px; }
+      .text-garage { font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 700; font-size: 235px; fill: #104C3A; letter-spacing: -5px; }
+    </style>
+  </defs>
+
+  <!-- Gruppo Pittogramma: The Gateway Portal + Auto Stilizzata -->
+  <g id="Symbol-Gateway-Portal" transform="translate(140, 88)">
+    <!-- Arco Esterno Protettivo -->
+    <path class="arch" d="M 0,412 L 0,212 A 212,212 0 0,1 424,212 L 424,412 L 364,412 L 364,212 A 152,152 0 0,0 60,212 L 60,412 Z" />
+    
+    <!-- Cupola e Lamelle Orizzontali della Serranda Superiore -->
+    <path class="slat" d="M 94,148 A 132,132 0 0,1 330,148 Z" />
+    <path class="slat" d="M 80,164 L 344,164 C 348,170 351,176 353,182 L 71,182 C 73,176 76,170 80,164 Z" />
+
+    <!-- Silhouette Auto Stilizzata Centrale -->
+    <path class="car" fill-rule="evenodd" d="
+      M 140,216 C 148,200 160,196 212,196 C 264,196 276,200 284,216 L 306,260
+      L 326,254 C 334,252 340,258 338,266 C 336,272 328,274 316,274 L 312,274
+      C 324,284 328,298 328,318 L 328,392 C 328,403 320,412 308,412 L 280,412
+      C 268,412 260,403 260,392 L 260,380 L 164,380 L 164,392 C 164,403 156,412 144,412
+      L 116,412 C 104,412 96,403 96,392 L 96,318 C 96,298 100,284 112,274 L 108,274
+      C 96,274 88,272 86,266 C 84,258 90,252 98,254 L 118,260 Z
+      M 152,222 C 157,212 168,210 212,210 C 256,210 267,212 272,222 L 290,262 L 134,262 Z
+      M 114,310 L 160,318 L 156,334 L 112,328 Z
+      M 310,310 L 264,318 L 268,334 L 312,328 Z
+      M 176,322 L 248,322 L 244,330 L 180,330 Z
+      M 180,338 L 244,338 L 240,346 L 184,346 Z
+      M 172,358 L 252,358 L 248,366 L 176,366 Z
+    " />
+  </g>
+
+  <!-- Logotipo Orizzontale MyGarage -->
+  <text x="645" y="382">
+    <tspan class="text-my">My</tspan><tspan class="text-garage" dx="6">Garage</tspan>
+  </text>
+</svg>

@@ -30,9 +30,15 @@ type VehicleIconViewProps = {
   icon: VehicleIconId;
   size?: number;
   color?: string;
+  strokeWidth?: number;
 };
 
-export const VehicleIconView: React.FC<VehicleIconViewProps> = ({ icon, size = 22, color }) => {
-  const Icon = iconComponents[icon];
-  return <Icon size={size} color={color} strokeWidth={1.8} />;
+export const VehicleIconView: React.FC<VehicleIconViewProps> = ({
+  icon,
+  size = 22,
+  color,
+  strokeWidth = 2,
+}) => {
+  const Icon = iconComponents[icon] || CarFront;
+  return <Icon size={size} color={color} strokeWidth={strokeWidth} />;
 };

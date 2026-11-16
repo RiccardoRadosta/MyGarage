@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight, Gauge, Wrench } from 'lucide-react-native';
-import { AppColors, appRadius, appSpacing } from '../../theme/theme';
+import { AppColors, appRadius, appShadows, appSpacing } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
 import { MaintenanceRecord, Vehicle } from '../../types';
 import { formatDate, formatMileage, getLastMaintenance } from '../../utils/maintenance';
@@ -21,7 +21,7 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onPress, reco
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${vehicle.brand} ${vehicle.model}, ${vehicle.plate}, ${formatMileage(vehicle.mileage)}`}
+      accessibilityLabel={`${vehicle.brand} ${vehicle.model}, targa ${vehicle.plate}, chilometraggio ${formatMileage(vehicle.mileage)}`}
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
@@ -29,113 +29,132 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onPress, reco
         <View style={styles.iconWrap}>
           <VehicleIconView icon={vehicle.icon} size={22} color={colors.primary} />
         </View>
+
         <View style={styles.vehicleCopy}>
-          <Text style={styles.modelName}>
+          <Text style={styles.modelName} numberOfLines={1}>
             {vehicle.brand} {vehicle.model}
           </Text>
-          <Text style={styles.metaText}>
-            {vehicle.year}{lastMaintenance ? ` · Ultimo intervento ${formatDate(lastMaintenance.date)}` : ' · Nessun intervento'}
+          <Text style={styles.metaText} numberOfLines={1}>
+            {vehicle.year ? `Anno ${vehicle.year}` : 'Veicolo'}
+            {lastMaintenance ? ` · Ultimo: ${formatDate(lastMaintenance.date)}` : ' · Nessun intervento'}
           </Text>
         </View>
+
         <View style={styles.plateBadge}>
           <Text style={styles.plateText}>{vehicle.plate}</Text>
         </View>
       </View>
 
       <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Gauge size={16} color={colors.primary} strokeWidth={1.8} />
-          <Text style={styles.mileageText}>{formatMileage(vehicle.mileage)}</Text>
+        <View style={styles.mileageBlock}>
+          <Gauge size={15} color={colors.primary} strokeWidth={2.2} />
+          <Text style={styles.mileageValue}>{formatMileage(vehicle.mileage)}</Text>
         </View>
-        <View style={styles.statItem}>
-          <Wrench size={14} color={colors.muted} strokeWidth={1.8} />
-          <Text style={styles.statText} numberOfLines={1}>
+
+        <View style={styles.maintenanceBlock}>
+          <Wrench size={13} color={colors.muted} strokeWidth={1.8} />
+          <Text style={styles.maintenanceText} numberOfLines={1}>
             {lastMaintenance ? lastMaintenance.type : 'Nessun intervento'}
           </Text>
         </View>
-        <ChevronRight size={17} color={colors.muted} />
+
+        <ChevronRight size={16} color={colors.muted} />
       </View>
     </Pressable>
   );
 };
 
-const createStyles = (colors: AppColors) => StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: appRadius.md,
-    padding: appSpacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: appSpacing.md,
-  },
-  pressed: {
-    backgroundColor: colors.primarySoft,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: appSpacing.md,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: appRadius.sm,
-    backgroundColor: colors.primarySoft,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: appSpacing.md,
-  },
-  vehicleCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  modelName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text,
-    fontFamily: 'Manrope_800ExtraBold',
-  },
-  metaText: {
+const createStyles = (colors: AppColors) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: appRadius.lg,
+      padding: appSpacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: appSpacing.md,
+      ...appShadows.subtle,
+    },
+    pressed: {
+      backgroundColor: colors.primarySoft,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: appSpacing.md,
+    },
+    iconWrap: {
+      width: 46,
+      height: 46,
+      borderRadius: appRadius.md,
+      backgroundColor: colors.primarySoft,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: appSpacing.md,
+    },
+    vehicleCopy: {
+      flex: 1,
+      minWidth: 0,
+      paddingRight: 6,
+    },
+    modelName: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: colors.text,
+      fontFamily: 'Manrope_800ExtraBold',
+      letterSpacing: -0.2,
+    },
+    metaText: {
       color: colors.muted,
-    fontSize: 12,
-    marginTop: 3,
-    fontFamily: 'Manrope_500Medium',
-  },
-  plateBadge: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: appRadius.sm,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    marginLeft: appSpacing.xs,
-  },
-  plateText: {
-    color: colors.text,
-    fontSize: 11,
-    fontFamily: 'Manrope_700Bold',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: appSpacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: appSpacing.sm,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: appSpacing.xs,
-    minWidth: 0,
-  },
-  mileageText: {
-    color: colors.text,
-    fontSize: 13,
-    fontFamily: 'Manrope_700Bold',
-  },
-  statText: {
-    color: colors.muted,
-    fontSize: 12,
-    fontFamily: 'Manrope_500Medium',
-  },
-});
+      fontSize: 12,
+      marginTop: 2,
+      fontFamily: 'Manrope_500Medium',
+    },
+    plateBadge: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: appRadius.xs,
+      backgroundColor: colors.primarySoft,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      alignSelf: 'center',
+    },
+    plateText: {
+      color: colors.primary,
+      fontSize: 11,
+      fontFamily: 'Manrope_800ExtraBold',
+      letterSpacing: 0.6,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 10,
+      gap: appSpacing.sm,
+    },
+    mileageBlock: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    mileageValue: {
+      color: colors.text,
+      fontSize: 14,
+      fontFamily: 'Manrope_700Bold',
+    },
+    maintenanceBlock: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      minWidth: 0,
+      paddingHorizontal: 4,
+    },
+    maintenanceText: {
+      color: colors.muted,
+      fontSize: 12,
+      fontFamily: 'Manrope_500Medium',
+    },
+  });

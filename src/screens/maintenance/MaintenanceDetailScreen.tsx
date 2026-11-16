@@ -1,30 +1,91 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import {
+  Battery,
+  CalendarDays,
+  CircleDollarSign,
+  CircleDot,
+  ClipboardCheck,
+  Cog,
+  Disc3,
+  Droplet,
+  FileText,
+  Gauge,
+  PencilLine,
+  Receipt,
+  ShieldCheck,
+  Trash2,
+  Wind,
+  Wrench,
+} from 'lucide-react-native';
 import { ScreenShell } from '../../components/common/ScreenShell';
 import { ActionButton } from '../../components/common/ActionButton';
 import { ScreenContextHeader } from '../../components/common/ScreenContextHeader';
 import { AppDialog, AppDialogOptions } from '../../components/common/AppDialog';
 import { AttachmentSection } from '../../components/maintenance/AttachmentSection';
+import { VehicleIconView } from '../../components/vehicle/VehicleIconView';
 import { useApp } from '../../store/AppContext';
-import { AppColors, appRadius, appSpacing } from '../../theme/theme';
+import { AppColors, appRadius, appShadows, appSpacing, appTypography } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
 import { formatCurrency, formatDate, formatMileage } from '../../utils/maintenance';
 
 type Props = NativeStackScreenProps<any>;
 
+const getMaintenanceIcon = (type: string) => {
+  switch (type.toLowerCase()) {
+    case 'cambio olio':
+      return Droplet;
+    case 'tagliando':
+    case 'revisione':
+      return ClipboardCheck;
+    case 'freni / pastiglie':
+    case 'freni':
+      return Disc3;
+    case 'cambio gomme':
+      return CircleDot;
+    case 'cambio tergicristalli':
+      return Wind;
+    case 'batteria':
+      return Battery;
+    case 'distribuzione':
+      return Cog;
+    case 'bollo':
+      return Receipt;
+    case 'assicurazione':
+    case 'insurance':
+      return ShieldCheck;
+    default:
+      return Wrench;
+  }
+};
+
 export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { maintenanceId } = route.params ?? {};
-  const { maintenanceRecords, deleteMaintenance } = useApp();
+  const { maintenanceRecords, deleteMaintenance, vehicles } = useApp();
   const colors = useAppColors();
   const styles = createStyles(colors);
   const [dialog, setDialog] = useState<AppDialogOptions | null>(null);
+
   const record = maintenanceRecords.find((item) => item.id === maintenanceId);
+  const vehicle = vehicles.find((item) => item.id === record?.vehicleId);
 
   if (!record) {
     return (
       <ScreenShell>
-        <Text style={styles.title}>Intervento non trovato</Text>
+        <ScreenContextHeader label="DETTAGLIO INTERVENTO" onBack={() => navigation.goBack()} />
+        <View style={styles.notFoundCard}>
+          <Text style={styles.notFoundTitle}>Intervento non trovato</Text>
+          <Text style={styles.notFoundSubtitle}>
+            L'intervento selezionato potrebbe essere stato eliminato o non è più disponibile.
+          </Text>
+          <ActionButton
+            title="Torna indietro"
+            variant="secondary"
+            onPress={() => navigation.goBack()}
+            style={styles.notFoundButton}
+          />
+        </View>
       </ScreenShell>
     );
   }
@@ -47,41 +108,158 @@ export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) 
       title: 'Elimina intervento',
       message: 'Vuoi eliminare questo intervento? L’operazione non può essere annullata.',
       confirmLabel: 'Elimina',
-      onConfirm: () => { void removeMaintenance(); },
+      onConfirm: () => {
+        void removeMaintenance();
+      },
     });
   };
 
+  const IconComponent = getMaintenanceIcon(record.type);
+  const hasCustomDesc =
+    Boolean(record.customDescription) && record.customDescription !== record.type;
+
   return (
     <ScreenShell>
+      {/* Intestazione di navigazione */}
       <ScreenContextHeader label="DETTAGLIO INTERVENTO" onBack={() => navigation.goBack()} />
-      <Text style={styles.title}>{record.type}</Text>
 
-      <View style={styles.card}>
-        <DetailRow label="Data" value={formatDate(record.date)} />
-        <DetailRow label="Chilometraggio" value={formatMileage(record.mileage)} />
-        <DetailRow label="Costo" value={formatCurrency(record.cost)} />
-        {record.notes ? <DetailRow label="Note" value={record.notes} /> : null}
-        {record.customDescription ? <DetailRow label="Descrizione" value={record.customDescription} /> : null}
+      {/* Intestazione di sezione con eyebrow */}
+      <View style={styles.headerBlock}>
+        <Text style={styles.eyebrow}>IL MIO GARAGE</Text>
+        <Text style={styles.screenTitle}>Dettaglio intervento</Text>
       </View>
 
-      <AttachmentSection
-        maintenanceId={record.id}
-        hasAttachmentInitial={record.hasAttachment}
-        readOnly
+      {/* 1. Hero Card: Identità Intervento e Veicolo */}
+      <View style={styles.heroCard}>
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroIconWrap}>
+            <IconComponent size={24} color={colors.primary} strokeWidth={2} />
+          </View>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroTitle} numberOfLines={2}>
+              {record.type}
+            </Text>
+            {hasCustomDesc ? (
+              <Text style={styles.heroCustomDesc} numberOfLines={2}>
+                {record.customDescription}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        {/* Associazione Veicolo (se presente) */}
+        {vehicle ? (
+          <>
+            <View style={styles.heroDivider} />
+            <View style={styles.vehicleRow}>
+              <View style={styles.vehicleCopy}>
+                <VehicleIconView icon={vehicle.icon} size={18} color={colors.primary} />
+                <Text style={styles.vehicleName} numberOfLines={1}>
+                  {vehicle.brand} {vehicle.model}
+                </Text>
+              </View>
+              {vehicle.plate ? (
+                <View style={styles.plateBadge}>
+                  <Text style={styles.plateText}>{vehicle.plate}</Text>
+                </View>
+              ) : null}
+            </View>
+          </>
+        ) : null}
+      </View>
+
+      {/* 2. Metriche dell'Intervento (3 colonne bilanciate e responsive) */}
+      <View style={styles.metricsRow}>
+        {/* Data */}
+        <View style={styles.metricCard}>
+          <View style={styles.metricIconWrap}>
+            <CalendarDays size={16} color={colors.primary} strokeWidth={2.2} />
+          </View>
+          <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>
+            {formatDate(record.date)}
+          </Text>
+          <Text style={styles.metricLabel} numberOfLines={1}>
+            Data
+          </Text>
+        </View>
+
+        {/* Chilometraggio */}
+        <View style={styles.metricCard}>
+          <View style={styles.metricIconWrap}>
+            <Gauge size={16} color={colors.primary} strokeWidth={2.2} />
+          </View>
+          <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>
+            {formatMileage(record.mileage)}
+          </Text>
+          <Text style={styles.metricLabel} numberOfLines={1}>
+            Chilometri
+          </Text>
+        </View>
+
+        {/* Costo */}
+        <View style={styles.metricCard}>
+          <View style={styles.metricIconWrap}>
+            <CircleDollarSign size={16} color={colors.primary} strokeWidth={2.2} />
+          </View>
+          <Text
+            style={[styles.metricValue, styles.metricHighlight]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {formatCurrency(record.cost)}
+          </Text>
+          <Text style={styles.metricLabel} numberOfLines={1}>
+            Costo
+          </Text>
+        </View>
+      </View>
+
+      {/* 3. Note e Dettagli (visibile solo se presenti) */}
+      {record.notes?.trim() ? (
+        <View style={styles.notesCard}>
+          <View style={styles.notesHeader}>
+            <FileText size={16} color={colors.primary} strokeWidth={2} />
+            <Text style={styles.notesTitle}>Note dell'intervento</Text>
+          </View>
+          <Text style={styles.notesText}>{record.notes.trim()}</Text>
+        </View>
+      ) : null}
+
+      {/* 4. Allegato PDF / JPEG */}
+      <View style={styles.attachmentSectionWrapper}>
+        <AttachmentSection
+          maintenanceId={record.id}
+          hasAttachmentInitial={record.hasAttachment}
+          readOnly
+        />
+      </View>
+
+      {/* 5. Azione Primaria: Modifica Intervento */}
+      <ActionButton
+        title="Modifica intervento"
+        icon={<PencilLine size={16} color={colors.white} strokeWidth={2.2} />}
+        onPress={() =>
+          navigation.navigate('MaintenanceForm', {
+            vehicleId: record.vehicleId,
+            maintenanceId: record.id,
+            mode: 'edit',
+          })
+        }
+        style={styles.primaryActionButton}
       />
 
-      <ActionButton
-        title="Modifica"
-        variant="secondary"
-        onPress={() => navigation.navigate('MaintenanceForm', { vehicleId: record.vehicleId, maintenanceId: record.id, mode: 'edit' })}
-        style={styles.button}
-      />
-      <ActionButton
-        title="Elimina intervento"
-        variant="danger"
-        onPress={handleDelete}
-        style={styles.button}
-      />
+      {/* 6. Gestione / Zona Pericolo: Elimina Intervento */}
+      <View style={styles.dangerZone}>
+        <Text style={styles.dangerEyebrow}>GESTIONE INTERVENTO</Text>
+        <ActionButton
+          title="Elimina intervento"
+          variant="danger"
+          icon={<Trash2 size={16} color={colors.danger} strokeWidth={2} />}
+          onPress={handleDelete}
+        />
+      </View>
+
+      {/* Dialog Modale per Conferme ed Errori */}
       <AppDialog
         visible={dialog !== null}
         title={dialog?.title ?? ''}
@@ -96,51 +274,241 @@ export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) 
   );
 };
 
-const DetailRow: React.FC<{ label: string; value: string }> = ({ label, value }) => {
-  const styles = createStyles(useAppColors());
-  return (
-    <View style={styles.row}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
-    </View>
-  );
-};
+const createStyles = (colors: AppColors) =>
+  StyleSheet.create({
+    headerBlock: {
+      marginTop: appSpacing.xs,
+      marginBottom: appSpacing.md,
+    },
+    eyebrow: {
+      ...appTypography.eyebrow,
+      color: colors.primary,
+      fontSize: 11,
+      letterSpacing: 1.2,
+      marginBottom: 2,
+    },
+    screenTitle: {
+      ...appTypography.display,
+      fontSize: 24,
+      lineHeight: 30,
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: -0.4,
+    },
 
-const createStyles = (colors: AppColors) => StyleSheet.create({
-  title: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: colors.text,
-    marginTop: 12,
-    marginBottom: 20,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: appRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: appSpacing.lg,
-    marginBottom: appSpacing.md,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  label: {
-    color: colors.muted,
-    fontSize: 16,
-  },
-  value: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-    maxWidth: '60%',
-    textAlign: 'right',
-  },
-  button: {
-    marginBottom: appSpacing.sm,
-  },
-});
+    /* 1. Hero Card Intervento */
+    heroCard: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderRadius: appRadius.lg,
+      borderWidth: 1,
+      padding: appSpacing.md,
+      marginBottom: appSpacing.md,
+      ...appShadows.subtle,
+    },
+    heroTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    heroIconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: appRadius.md,
+      backgroundColor: colors.primarySoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: appSpacing.md,
+    },
+    heroCopy: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    heroTitle: {
+      ...appTypography.heading,
+      fontSize: 20,
+      lineHeight: 26,
+      fontWeight: '800',
+      fontFamily: 'Manrope_800ExtraBold',
+      color: colors.text,
+    },
+    heroCustomDesc: {
+      ...appTypography.caption,
+      color: colors.muted,
+      fontSize: 13,
+      marginTop: 2,
+    },
+    heroDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: appSpacing.sm + 2,
+    },
+    vehicleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: appSpacing.xs,
+    },
+    vehicleCopy: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+      minWidth: 0,
+    },
+    vehicleName: {
+      fontSize: 13,
+      fontWeight: '700',
+      fontFamily: 'Manrope_700Bold',
+      color: colors.text,
+      flex: 1,
+    },
+    plateBadge: {
+      backgroundColor: colors.background,
+      borderColor: colors.border,
+      borderRadius: appRadius.sm,
+      borderWidth: 1.5,
+      paddingHorizontal: appSpacing.sm,
+      paddingVertical: 3,
+    },
+    plateText: {
+      color: colors.text,
+      fontSize: 12,
+      fontFamily: 'Manrope_800ExtraBold',
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+    },
+
+    /* 2. Metriche dell'Intervento */
+    metricsRow: {
+      flexDirection: 'row',
+      gap: appSpacing.xs + 2,
+      marginBottom: appSpacing.md,
+    },
+    metricCard: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderRadius: appRadius.md,
+      borderWidth: 1,
+      paddingVertical: appSpacing.sm,
+      paddingHorizontal: 6,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...appShadows.subtle,
+      minHeight: 88,
+    },
+    metricIconWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: appRadius.full,
+      backgroundColor: colors.primarySoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 6,
+    },
+    metricValue: {
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '800',
+      fontFamily: 'Manrope_800ExtraBold',
+      color: colors.text,
+      textAlign: 'center',
+      width: '100%',
+    },
+    metricHighlight: {
+      color: colors.primary,
+    },
+    metricLabel: {
+      fontSize: 10,
+      color: colors.muted,
+      fontFamily: 'Manrope_600SemiBold',
+      textAlign: 'center',
+      marginTop: 2,
+    },
+
+    /* 3. Note e Dettagli */
+    notesCard: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderRadius: appRadius.lg,
+      borderWidth: 1,
+      padding: appSpacing.md,
+      marginBottom: appSpacing.md,
+      ...appShadows.subtle,
+    },
+    notesHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: appSpacing.xs + 2,
+    },
+    notesTitle: {
+      ...appTypography.cardTitle,
+      color: colors.text,
+      fontSize: 14,
+      fontFamily: 'Manrope_700Bold',
+    },
+    notesText: {
+      ...appTypography.body,
+      color: colors.text,
+      fontSize: 13,
+      lineHeight: 20,
+    },
+
+    /* 4. Allegati Wrapper */
+    attachmentSectionWrapper: {
+      marginBottom: appSpacing.md,
+    },
+
+    /* 5. Azione Primaria */
+    primaryActionButton: {
+      marginBottom: appSpacing.xl,
+    },
+
+    /* 6. Gestione / Zona Pericolo */
+    dangerZone: {
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      paddingTop: appSpacing.lg,
+      marginBottom: appSpacing.xxl,
+    },
+    dangerEyebrow: {
+      ...appTypography.eyebrow,
+      color: colors.muted,
+      fontSize: 10,
+      letterSpacing: 1,
+      marginBottom: appSpacing.sm,
+      marginLeft: 2,
+    },
+
+    /* Stato Not Found */
+    notFoundCard: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderRadius: appRadius.lg,
+      borderWidth: 1,
+      padding: appSpacing.xl,
+      alignItems: 'center',
+      marginTop: appSpacing.lg,
+      ...appShadows.subtle,
+    },
+    notFoundTitle: {
+      ...appTypography.title,
+      color: colors.text,
+      fontSize: 18,
+      textAlign: 'center',
+      marginBottom: 6,
+    },
+    notFoundSubtitle: {
+      ...appTypography.body,
+      color: colors.muted,
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 18,
+      marginBottom: appSpacing.lg,
+      maxWidth: 280,
+    },
+    notFoundButton: {
+      minWidth: 160,
+    },
+  });

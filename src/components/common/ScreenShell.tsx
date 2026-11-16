@@ -1,30 +1,26 @@
 import React from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { SafeAreaView, Edge } from 'react-native-safe-area-context';
 import { appSpacing } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
 
-export const ScreenShell: React.FC<{ children: React.ReactNode; contentStyle?: object }> = ({
+export type ScreenShellProps = {
+  children: React.ReactNode;
+  contentStyle?: StyleProp<ViewStyle>;
+  style?: StyleProp<ViewStyle>;
+  edges?: readonly Edge[];
+};
+
+export const ScreenShell: React.FC<ScreenShellProps> = ({
   children,
   contentStyle,
-}) => <ScreenContent children={children} contentStyle={contentStyle} />;
-
-const ScreenContent: React.FC<{ children: React.ReactNode; contentStyle?: object }> = ({ children, contentStyle }) => {
+  style,
+  edges = ['top', 'bottom'],
+}) => {
   const colors = useAppColors();
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    content: {
-      paddingHorizontal: appSpacing.md,
-      paddingTop: appSpacing.lg,
-      paddingBottom: appSpacing.xxl,
-    },
-  });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, style]} edges={edges}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -35,3 +31,14 @@ const ScreenContent: React.FC<{ children: React.ReactNode; contentStyle?: object
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: appSpacing.md,
+    paddingTop: appSpacing.lg,
+    paddingBottom: appSpacing.xxl,
+  },
+});

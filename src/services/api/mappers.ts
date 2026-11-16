@@ -11,6 +11,8 @@ const apiTypeByLabel: Record<string, ApiMaintenanceType> = {
   Revisione: 'INSPECTION',
   Batteria: 'BATTERY',
   Distribuzione: 'TIMING_BELT',
+  Bollo: 'BOLLO',
+  Assicurazione: 'INSURANCE',
 };
 
 export const toApiMaintenanceType = (label: string): ApiMaintenanceType =>

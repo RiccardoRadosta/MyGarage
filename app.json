@@ -2,19 +2,25 @@
   "expo": {
     "name": "MyGarage",
     "slug": "MyGarage",
+    "scheme": "mygarage",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/branding/generated/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/branding/generated/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#104C3A"
+    },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#104C3A",
+        "foregroundImage": "./assets/branding/generated/icon-foreground.png",
+        "backgroundImage": "./assets/branding/generated/icon-background.png",
+        "monochromeImage": "./assets/branding/generated/icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -33,7 +39,8 @@
           "photosPermission": "Consenti a Il Mio Garage di scegliere foto da allegare agli interventi.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-status-bar"
     ]
   }
 }

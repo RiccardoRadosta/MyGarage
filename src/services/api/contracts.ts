@@ -9,6 +9,8 @@ export type ApiMaintenanceType =
   | 'INSPECTION'
   | 'BATTERY'
   | 'TIMING_BELT'
+  | 'BOLLO'
+  | 'INSURANCE'
   | 'OTHER';
 
 export type ApiUser = {
