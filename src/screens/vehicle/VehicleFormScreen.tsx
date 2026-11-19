@@ -198,90 +198,106 @@ export const VehicleFormScreen: React.FC<Props> = ({ navigation, route }) => {
         nextErrors.mileage = 'Inserisci solo cifre numeriche intere.';
       } else if (!Number.isSafeInteger(numericMileage) || numericMileage > 2000000) {
         nextErrors.mileage = 'Inserisci un chilometraggio verosimile (max 2.000.000 km).';
-      } else if (isMileageMode && vehicle && numericMileage < vehicle.mileage) {
-        nextErrors.mileage = `Il chilometraggio non può essere inferiore all'ultimo registrato (${formatMileage(vehicle.mileage)}).`;
       }
     }
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    setIsSaving(true);
-    try {
-      if (isMileageMode && vehicle) {
-        await updateVehicle({ ...vehicle, mileage: numericMileage });
-      } else if (isDetailsMode && vehicle) {
-        await updateVehicle({
-          ...vehicle,
-          brand: trimmedBrand,
-          icon: vehicleIcon,
-          model: trimmedModel,
-          year: Number(year.trim()),
-          plate: cleanedPlate,
-        });
-      } else {
-        await addVehicle({
-          brand: trimmedBrand,
-          icon: vehicleIcon,
-          model: trimmedModel,
-          year: Number(year.trim()),
-          plate: cleanedPlate,
-          mileage: numericMileage,
-        });
-      }
-
-      navigation.goBack();
-    } catch (error) {
-      let title = 'Salvataggio non riuscito';
-      let message = 'Riprova tra poco.';
-
-      if (error instanceof ApiError) {
-        const isDuplicatePlate =
-          error.status === 409 ||
-          error.code === 'DUPLICATE_PLATE' ||
-          error.code === 'PLATE_ALREADY_EXISTS' ||
-          error.fieldErrors?.some(
-            (fe) =>
-              fe.field === 'plate' &&
-              (fe.code.includes('DUPLICATE') || fe.code.includes('EXISTS')),
-          ) ||
-          error.message.toLowerCase().includes('targa') ||
-          error.message.toLowerCase().includes('plate');
-
-        if (isDuplicatePlate) {
-          title = 'Targa già registrata';
-          message = 'Un veicolo con questa targa è già presente nel tuo garage.';
-          setErrors((prev) => ({
-            ...prev,
-            plate: 'Targa già associata a un altro veicolo.',
-          }));
-        } else if (error.fieldErrors && error.fieldErrors.length > 0) {
-          const serverErrors: typeof errors = {};
-          error.fieldErrors.forEach((fe) => {
-            if (fe.field === 'brand') serverErrors.brand = fe.message;
-            if (fe.field === 'model') serverErrors.model = fe.message;
-            if (fe.field === 'year') serverErrors.year = fe.message;
-            if (fe.field === 'plate') serverErrors.plate = fe.message;
-            if (fe.field === 'mileage') serverErrors.mileage = fe.message;
+    const executeSave = async () => {
+      setIsSaving(true);
+      try {
+        if (isMileageMode && vehicle) {
+          await updateVehicle({ ...vehicle, mileage: numericMileage });
+        } else if (isDetailsMode && vehicle) {
+          await updateVehicle({
+            ...vehicle,
+            brand: trimmedBrand,
+            icon: vehicleIcon,
+            model: trimmedModel,
+            year: Number(year.trim()),
+            plate: cleanedPlate,
           });
-          setErrors((prev) => ({ ...prev, ...serverErrors }));
-          title = 'Dati non validi';
-          message = error.message || 'Verifica i campi evidenziati in rosso.';
         } else {
+          await addVehicle({
+            brand: trimmedBrand,
+            icon: vehicleIcon,
+            model: trimmedModel,
+            year: Number(year.trim()),
+            plate: cleanedPlate,
+            mileage: numericMileage,
+          });
+        }
+
+        navigation.goBack();
+      } catch (error) {
+        let title = 'Salvataggio non riuscito';
+        let message = 'Riprova tra poco.';
+
+        if (error instanceof ApiError) {
+          const isDuplicatePlate =
+            error.status === 409 ||
+            error.code === 'DUPLICATE_PLATE' ||
+            error.code === 'PLATE_ALREADY_EXISTS' ||
+            error.fieldErrors?.some(
+              (fe) =>
+                fe.field === 'plate' &&
+                (fe.code.includes('DUPLICATE') || fe.code.includes('EXISTS')),
+            ) ||
+            error.message.toLowerCase().includes('targa') ||
+            error.message.toLowerCase().includes('plate');
+
+          if (isDuplicatePlate) {
+            title = 'Targa già registrata';
+            message = 'Un veicolo con questa targa è già presente nel tuo garage.';
+            setErrors((prev) => ({
+              ...prev,
+              plate: 'Targa già associata a un altro veicolo.',
+            }));
+          } else if (error.fieldErrors && error.fieldErrors.length > 0) {
+            const serverErrors: typeof errors = {};
+            error.fieldErrors.forEach((fe) => {
+              if (fe.field === 'brand') serverErrors.brand = fe.message;
+              if (fe.field === 'model') serverErrors.model = fe.message;
+              if (fe.field === 'year') serverErrors.year = fe.message;
+              if (fe.field === 'plate') serverErrors.plate = fe.message;
+              if (fe.field === 'mileage') serverErrors.mileage = fe.message;
+            });
+            setErrors((prev) => ({ ...prev, ...serverErrors }));
+            title = 'Dati non validi';
+            message = error.message || 'Verifica i campi evidenziati in rosso.';
+          } else {
+            message = error.message;
+          }
+        } else if (error instanceof Error) {
           message = error.message;
         }
-      } else if (error instanceof Error) {
-        message = error.message;
-      }
 
+        setDialog({
+          title,
+          message,
+          tone: 'danger',
+        });
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    if (isMileageMode && vehicle && numericMileage < vehicle.mileage) {
       setDialog({
-        title,
-        message,
-        tone: 'danger',
+        title: 'Chilometraggio inferiore',
+        message: `Il valore inserito (${formatMileage(numericMileage)}) è inferiore a quello attualmente registrato (${formatMileage(vehicle.mileage)}).\n\nConfermi di voler correggere il chilometraggio del veicolo?`,
+        tone: 'info',
+        confirmLabel: 'Conferma e salva',
+        cancelLabel: 'Annulla',
+        onConfirm: () => {
+          void executeSave();
+        },
       });
-    } finally {
-      setIsSaving(false);
+      return;
     }
+
+    await executeSave();
   };
 
   return (

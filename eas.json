@@ -9,12 +9,17 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.0.173:8080"
+        "EXPO_PUBLIC_API_URL": "http://192.168.0.173:8080",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "742714618297-hq2u016qnmv64v8qn1fn07rdnp5f6ch1.apps.googleusercontent.com"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://mygarage-backend-463658012427.europe-west1.run.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "742714618297-hq2u016qnmv64v8qn1fn07rdnp5f6ch1.apps.googleusercontent.com"
       }
     }
   }

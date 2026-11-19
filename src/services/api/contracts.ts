@@ -127,6 +127,10 @@ export type CreateMaintenanceRequest = {
 
 export type UpdateMaintenanceRequest = Partial<CreateMaintenanceRequest>;
 
+export type GoogleLoginRequest = {
+  idToken: string;
+};
+
 export type ApiProblem = {
   type?: string;
   title?: string;

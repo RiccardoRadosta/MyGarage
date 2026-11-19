@@ -4,6 +4,7 @@ import { ApiCostsSummary } from '../services/api/contracts';
 import { ApiError, apiClient } from '../services/api/ApiClient';
 import { authApi, costsApi, maintenancesApi, usersApi, vehiclesApi } from '../services/api/api';
 import { fromApiMaintenance, fromApiUser, fromApiVehicle, toApiMaintenancePayload } from '../services/api/mappers';
+import { signOutGoogle } from '../services/googleAuth';
 
 const INITIAL_USER: User = {
   id: 'u-1',
@@ -31,6 +32,7 @@ type AppContextType = {
   maintenanceRecords: MaintenanceRecord[];
   costSummary: ApiCostsSummary | null;
   login: (email: string, password: string) => Promise<boolean>;
+  loginWithGoogle: (idToken: string) => Promise<boolean>;
   register: (name: string, email: string, password: string, confirmPassword: string) => Promise<boolean>;
   updateProfile: (name: string, email: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -140,6 +142,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  const loginWithGoogle = async (idToken: string) => {
+    if (!idToken.trim()) {
+      return false;
+    }
+
+    if (apiClient.isConfigured) {
+      try {
+        const result = await authApi.googleLogin(idToken.trim());
+        const data = await loadRemoteData();
+        setUser(fromApiUser(result.user));
+        applyRemoteData(data);
+        setIsAuthenticated(true);
+        return true;
+      } catch (error) {
+        // Se il backend rifiuta l'accesso (es. 409 Conflict, 401, ecc.), resetta la sessione Google locale
+        await signOutGoogle();
+        throw error;
+      }
+    }
+
+    return false;
+  };
+
   const register = async (name: string, email: string, password: string, confirmPassword: string) => {
     const minimumPasswordLength = apiClient.isConfigured ? 8 : 6;
     if (!name.trim() || !email.trim() || password.length < minimumPasswordLength || password !== confirmPassword) {
@@ -174,6 +199,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await apiClient.clearTokens();
       }
     }
+    await signOutGoogle();
     setWelcomePending(false);
     setIsAuthenticated(false);
     setUser(null);
@@ -329,6 +355,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       maintenanceRecords,
       costSummary,
       login,
+      loginWithGoogle,
       register,
       updateProfile,
       logout,

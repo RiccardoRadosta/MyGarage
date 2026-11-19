@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Linking, View } from 'react-native';
+import { Linking } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -13,6 +13,7 @@ import { useApp } from '../store/AppContext';
 import { getAppColors } from '../theme/theme';
 import { useThemePreference } from '../theme/ThemeContext';
 import { extractResetTokenFromUrl } from '../utils/linkingUtils';
+import { LoadingScreen } from '../components/common/LoadingScreen';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
@@ -144,11 +145,7 @@ export const AppNavigator = () => {
   }, [isAuthenticated]);
 
   if (isInitializing) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   return (

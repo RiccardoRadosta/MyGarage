@@ -14,6 +14,7 @@ import {
   ApiVehicleSummary,
   CreateMaintenanceRequest,
   CreateVehicleRequest,
+  GoogleLoginRequest,
   UpdateMaintenanceRequest,
   UpdateVehicleRequest,
 } from './contracts';
@@ -34,6 +35,16 @@ export const authApi = {
     const result = await apiClient.request<ApiTokens>('/api/v1/auth/login', {
       method: 'POST',
       body: jsonBody({ email, password }),
+    }, false);
+    await apiClient.setTokens(result.accessToken, result.refreshToken);
+    return result;
+  },
+
+  async googleLogin(idToken: string) {
+    const payload: GoogleLoginRequest = { idToken };
+    const result = await apiClient.request<ApiTokens>('/api/v1/auth/google', {
+      method: 'POST',
+      body: jsonBody(payload),
     }, false);
     await apiClient.setTokens(result.accessToken, result.refreshToken);
     return result;

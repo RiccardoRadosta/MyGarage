@@ -14,6 +14,7 @@ import { AppProvider } from './src/store/AppContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { getAppColors } from './src/theme/theme';
 import { ThemeProvider, useThemePreference } from './src/theme/ThemeContext';
+import { LoadingScreen } from './src/components/common/LoadingScreen';
 
 const ThemedApp = () => {
   const { isDarkMode } = useThemePreference();
@@ -60,14 +61,10 @@ export default function App() {
     Manrope_800ExtraBold,
   });
 
-  if (!fontsLoaded) {
-    return null;
-  }
-
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <ThemedApp />
+        {!fontsLoaded ? <LoadingScreen isFontLoading /> : <ThemedApp />}
       </ThemeProvider>
     </SafeAreaProvider>
   );

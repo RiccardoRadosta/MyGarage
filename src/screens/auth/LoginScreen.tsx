@@ -10,12 +10,14 @@ import { ScreenContextHeader } from '../../components/common/ScreenContextHeader
 import { useApp } from '../../store/AppContext';
 import { AppColors, appRadius, appShadows, appSpacing, appTypography } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
-import { apiClient } from '../../services/api/ApiClient';
+import { ApiError, apiClient } from '../../services/api/ApiClient';
+import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton';
+import { signInWithGoogle } from '../../services/googleAuth';
 
 type Props = NativeStackScreenProps<any>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { login } = useApp();
+  const { login, loginWithGoogle } = useApp();
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -23,6 +25,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState(apiClient.isConfigured ? '' : '123456');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [dialog, setDialog] = useState<{ title: string; message: string } | null>(null);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
@@ -49,7 +52,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleLogin = async () => {
-    if (isSubmitting) return;
+    if (isSubmitting || isGoogleSubmitting) return;
     const nextErrors: typeof errors = {};
     if (!email.trim()) nextErrors.email = 'Inserisci la tua email.';
     if (!password.trim()) nextErrors.password = 'Inserisci la password.';
@@ -74,6 +77,46 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    if (isSubmitting || isGoogleSubmitting) return;
+    setIsGoogleSubmitting(true);
+    try {
+      const result = await signInWithGoogle();
+      if (!result.success && result.cancelled) {
+        return;
+      }
+      if (result.success) {
+        const ok = await loginWithGoogle(result.idToken);
+        if (!ok) {
+          setDialog({ title: 'Accesso non riuscito', message: 'Impossibile completare l\'accesso con Google. Riprova.' });
+        }
+      }
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.status === 409) {
+          setDialog({
+            title: 'Account già registrato',
+            message: 'Esiste già un account registrato con questa email. Accedi utilizzando email e password oppure riprova con un altro account Google.',
+          });
+          return;
+        }
+        if (error.status === 401) {
+          setDialog({
+            title: 'Accesso non riuscito',
+            message: 'Token Google non valido, scaduto o audience non riconosciuta.',
+          });
+          return;
+        }
+      }
+      setDialog({
+        title: 'Accesso con Google non riuscito',
+        message: error instanceof Error ? error.message : 'Si è verificato un errore durante l\'accesso con Google.',
+      });
+    } finally {
+      setIsGoogleSubmitting(false);
+    }
+  };
+
   return (
     <ScreenShell>
       <ScreenContextHeader label="ACCESSO" onBack={handleBack} />
@@ -84,6 +127,18 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       <View style={styles.formCard}>
+        <GoogleSignInButton
+          onPress={handleGoogleLogin}
+          loading={isGoogleSubmitting}
+          disabled={isSubmitting || isGoogleSubmitting}
+        />
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>oppure</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
         <View style={styles.inputWrapper}>
           <TextInput
             label="Email"
@@ -97,7 +152,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             autoCapitalize="none"
             autoCorrect={false}
             error={!!errors.email}
-            editable={!isSubmitting}
+            editable={!isSubmitting && !isGoogleSubmitting}
             theme={inputTheme}
             style={styles.fieldInput}
             left={<TextInput.Icon icon={() => <Mail size={18} color={colors.primary} strokeWidth={2} />} />}
@@ -116,7 +171,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             }}
             secureTextEntry={!showPassword}
             error={!!errors.password}
-            editable={!isSubmitting}
+            editable={!isSubmitting && !isGoogleSubmitting}
             theme={inputTheme}
             style={styles.fieldInput}
             left={<TextInput.Icon icon={() => <Lock size={18} color={colors.primary} strokeWidth={2} />} />}
@@ -137,6 +192,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           accessibilityRole="button"
           onPress={() => navigation.navigate('ForgotPassword')}
           style={styles.forgotPasswordPressable}
+          disabled={isSubmitting || isGoogleSubmitting}
         >
           <Text style={styles.forgotPasswordText}>Password dimenticata?</Text>
         </Pressable>
@@ -145,6 +201,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           title="Accedi"
           loading={isSubmitting}
           loadingTitle="Accesso in corso..."
+          disabled={isSubmitting || isGoogleSubmitting}
           onPress={handleLogin}
           fullWidth
           style={styles.button}
@@ -197,6 +254,24 @@ const createStyles = (colors: AppColors) =>
       borderWidth: 1,
       padding: appSpacing.lg,
       ...appShadows.subtle,
+    },
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: appSpacing.md,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    dividerText: {
+      marginHorizontal: appSpacing.md,
+      color: colors.muted,
+      fontSize: 12,
+      fontFamily: 'Manrope_600SemiBold',
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
     },
     inputWrapper: {
       marginBottom: appSpacing.sm,
