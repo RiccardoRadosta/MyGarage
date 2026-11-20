@@ -38,6 +38,7 @@ export type ApiVehicleSummary = {
   year: number;
   plate: string;
   mileage: number;
+  isPrimary?: boolean;
   lastMaintenance: ApiMaintenanceSummary | null;
 };
 
@@ -52,6 +53,7 @@ export type ApiMaintenanceSummary = {
 };
 
 export type ApiVehicle = ApiVehicleSummary & {
+  isPrimary: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -140,4 +142,32 @@ export type ApiProblem = {
   instance?: string;
   fieldErrors?: Array<{ field: string; code: string; message: string }>;
   traceId?: string;
+};
+
+export type ApiSubscriptionTier = 'FREE' | 'PREMIUM';
+
+export type ApiPlanOrigin = 'GRANT' | 'GOOGLE_PLAY' | 'FREE_TIER';
+
+export type ApiGrantType = 'DEVELOPER' | 'TESTER' | 'COLLABORATOR';
+
+export type ApiSubscriptionStatus =
+  | 'ACTIVE'
+  | 'EXPIRED'
+  | 'CANCELED'
+  | 'IN_GRACE_PERIOD'
+  | 'ON_HOLD'
+  | 'PAUSED';
+
+export type ApiUserPlan = {
+  tier: ApiSubscriptionTier;
+  isPremium: boolean;
+  origin: ApiPlanOrigin;
+  grantType: ApiGrantType | null;
+  subscriptionStatus: ApiSubscriptionStatus | null;
+  productId: string | null;
+  expiresAt: string | null;
+  autoRenewing: boolean;
+  isPermanent: boolean;
+  primaryVehicleId: string | null;
+  requiresPrimarySelection: boolean;
 };

@@ -12,7 +12,36 @@ export type Vehicle = {
   year: number;
   plate: string;
   mileage: number;
+  isPrimary?: boolean;
   createdAt?: string;
+};
+
+export type SubscriptionTier = 'FREE' | 'PREMIUM';
+
+export type PlanOrigin = 'GRANT' | 'GOOGLE_PLAY' | 'FREE_TIER';
+
+export type GrantType = 'DEVELOPER' | 'TESTER' | 'COLLABORATOR';
+
+export type SubscriptionStatus =
+  | 'ACTIVE'
+  | 'EXPIRED'
+  | 'CANCELED'
+  | 'IN_GRACE_PERIOD'
+  | 'ON_HOLD'
+  | 'PAUSED';
+
+export type UserPlan = {
+  tier: SubscriptionTier;
+  isPremium: boolean;
+  origin: PlanOrigin;
+  grantType: GrantType | null;
+  subscriptionStatus: SubscriptionStatus | null;
+  productId: string | null;
+  expiresAt: string | null;
+  autoRenewing: boolean;
+  isPermanent: boolean;
+  primaryVehicleId: string | null;
+  requiresPrimarySelection: boolean;
 };
 
 export type VehicleIconId = 'carFront' | 'car' | 'motorbike' | 'scooter' | 'truck' | 'van';

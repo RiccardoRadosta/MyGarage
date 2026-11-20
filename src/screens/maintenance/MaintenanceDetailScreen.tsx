@@ -12,6 +12,7 @@ import {
   Droplet,
   FileText,
   Gauge,
+  Info,
   PencilLine,
   Receipt,
   ShieldCheck,
@@ -26,9 +27,11 @@ import { AppDialog, AppDialogOptions } from '../../components/common/AppDialog';
 import { AttachmentSection } from '../../components/maintenance/AttachmentSection';
 import { VehicleIconView } from '../../components/vehicle/VehicleIconView';
 import { useApp } from '../../store/AppContext';
+import { ApiError } from '../../services/api/ApiClient';
 import { AppColors, appRadius, appShadows, appSpacing, appTypography } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
 import { formatCurrency, formatDate, formatMileage } from '../../utils/maintenance';
+import { navigateToPremium } from '../../utils/navigationUtils';
 
 type Props = NativeStackScreenProps<any>;
 
@@ -62,13 +65,14 @@ const getMaintenanceIcon = (type: string) => {
 
 export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { maintenanceId } = route.params ?? {};
-  const { maintenanceRecords, deleteMaintenance, vehicles } = useApp();
+  const { maintenanceRecords, deleteMaintenance, vehicles, canWriteMaintenanceForVehicle, requiresPrimarySelection, refreshPlan } = useApp();
   const colors = useAppColors();
   const styles = createStyles(colors);
   const [dialog, setDialog] = useState<AppDialogOptions | null>(null);
 
   const record = maintenanceRecords.find((item) => item.id === maintenanceId);
   const vehicle = vehicles.find((item) => item.id === record?.vehicleId);
+  const isWritable = vehicle ? canWriteMaintenanceForVehicle(vehicle.id) : false;
 
   if (!record) {
     return (
@@ -95,6 +99,35 @@ export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) 
       await deleteMaintenance(record.id);
       navigation.goBack();
     } catch (error) {
+      if (error instanceof ApiError && error.code === 'PRIMARY_VEHICLE_SELECTION_REQUIRED') {
+        void refreshPlan();
+        setDialog({
+          tone: 'info',
+          title: 'Scelta obbligatoria',
+          message: 'È necessario selezionare prima il veicolo principale.',
+          confirmLabel: 'Seleziona veicolo',
+          onConfirm: () => {
+            setDialog(null);
+            navigation.navigate('PrimaryVehicleSelection');
+          },
+        });
+        return;
+      }
+      if (error instanceof ApiError && error.code === 'UPGRADE_REQUIRED') {
+        void refreshPlan();
+        setDialog({
+          tone: 'info',
+          title: 'Funzionalità Premium',
+          message: error.message || 'Questa operazione richiede un piano Premium.',
+          confirmLabel: 'Scopri Premium',
+          cancelLabel: 'Chiudi',
+          onConfirm: () => {
+            setDialog(null);
+            navigateToPremium(navigation);
+          },
+        });
+        return;
+      }
       setDialog({
         title: 'Eliminazione non riuscita',
         message: error instanceof Error ? error.message : 'Riprova tra poco.',
@@ -103,6 +136,16 @@ export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) 
   };
 
   const handleDelete = () => {
+    if (!isWritable) {
+      setDialog({
+        tone: 'info',
+        title: 'Operazione non consentita',
+        message:
+          'Nel piano Free non è consentito eliminare interventi associati a un veicolo secondario.',
+        confirmLabel: 'Chiudi',
+      });
+      return;
+    }
     setDialog({
       tone: 'danger',
       title: 'Elimina intervento',
@@ -128,6 +171,18 @@ export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) 
         <Text style={styles.eyebrow}>IL MIO GARAGE</Text>
         <Text style={styles.screenTitle}>Dettaglio intervento</Text>
       </View>
+
+      {/* Avviso Veicolo Secondario in sola consultazione */}
+      {!isWritable && !requiresPrimarySelection ? (
+        <View style={styles.readOnlyNotice}>
+          <View style={styles.readOnlyNoticeIconWrap}>
+            <Info size={16} color={colors.primary} />
+          </View>
+          <Text style={styles.readOnlyNoticeText}>
+            Veicolo secondario (Piano Free) — Questo intervento è in sola consultazione. Le modifiche e l'eliminazione sono consentite solo sul veicolo principale.
+          </Text>
+        </View>
+      ) : null}
 
       {/* 1. Hero Card: Identità Intervento e Veicolo */}
       <View style={styles.heroCard}>
@@ -234,30 +289,34 @@ export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) 
         />
       </View>
 
-      {/* 5. Azione Primaria: Modifica Intervento */}
-      <ActionButton
-        title="Modifica intervento"
-        icon={<PencilLine size={16} color={colors.white} strokeWidth={2.2} />}
-        onPress={() =>
-          navigation.navigate('MaintenanceForm', {
-            vehicleId: record.vehicleId,
-            maintenanceId: record.id,
-            mode: 'edit',
-          })
-        }
-        style={styles.primaryActionButton}
-      />
-
-      {/* 6. Gestione / Zona Pericolo: Elimina Intervento */}
-      <View style={styles.dangerZone}>
-        <Text style={styles.dangerEyebrow}>GESTIONE INTERVENTO</Text>
+      {/* 5. Azione Primaria: Modifica Intervento (solo se scrivibile) */}
+      {isWritable ? (
         <ActionButton
-          title="Elimina intervento"
-          variant="danger"
-          icon={<Trash2 size={16} color={colors.danger} strokeWidth={2} />}
-          onPress={handleDelete}
+          title="Modifica intervento"
+          icon={<PencilLine size={16} color={colors.white} strokeWidth={2.2} />}
+          onPress={() =>
+            navigation.navigate('MaintenanceForm', {
+              vehicleId: record.vehicleId,
+              maintenanceId: record.id,
+              mode: 'edit',
+            })
+          }
+          style={styles.primaryActionButton}
         />
-      </View>
+      ) : null}
+
+      {/* 6. Gestione / Zona Pericolo: Elimina Intervento (solo se scrivibile) */}
+      {isWritable ? (
+        <View style={styles.dangerZone}>
+          <Text style={styles.dangerEyebrow}>GESTIONE INTERVENTO</Text>
+          <ActionButton
+            title="Elimina intervento"
+            variant="danger"
+            icon={<Trash2 size={16} color={colors.danger} strokeWidth={2} />}
+            onPress={handleDelete}
+          />
+        </View>
+      ) : null}
 
       {/* Dialog Modale per Conferme ed Errori */}
       <AppDialog
@@ -276,6 +335,32 @@ export const MaintenanceDetailScreen: React.FC<Props> = ({ navigation, route }) 
 
 const createStyles = (colors: AppColors) =>
   StyleSheet.create({
+    readOnlyNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: appSpacing.sm,
+      backgroundColor: colors.primarySoft,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: appRadius.md,
+      padding: appSpacing.md,
+      marginBottom: appSpacing.md,
+    },
+    readOnlyNoticeIconWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: appRadius.sm,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    readOnlyNoticeText: {
+      flex: 1,
+      ...appTypography.caption,
+      color: colors.text,
+      fontSize: 12.5,
+      lineHeight: 17,
+    },
     headerBlock: {
       marginTop: appSpacing.xs,
       marginBottom: appSpacing.md,

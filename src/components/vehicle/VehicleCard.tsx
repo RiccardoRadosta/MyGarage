@@ -1,34 +1,79 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { ChevronRight, Gauge, Wrench } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ChevronRight, Gauge, Star, Wrench } from 'lucide-react-native';
 import { AppColors, appRadius, appShadows, appSpacing } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
 import { MaintenanceRecord, Vehicle } from '../../types';
 import { formatDate, formatMileage, getLastMaintenance } from '../../utils/maintenance';
+import { useApp } from '../../store/AppContext';
 import { VehicleIconView } from './VehicleIconView';
 
 type VehicleCardProps = {
   vehicle: Vehicle;
   onPress: () => void;
   records: MaintenanceRecord[];
+  onSetPrimary?: (vehicle: Vehicle) => void | Promise<void>;
 };
 
-export const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onPress, records }) => {
+export const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onPress, records, onSetPrimary }) => {
   const colors = useAppColors();
   const styles = createStyles(colors);
+  const { setPrimaryVehicle, isSettingPrimary } = useApp();
+  const [isUpdating, setIsUpdating] = useState(false);
   const lastMaintenance = getLastMaintenance(vehicle.id, records);
+
+  const handlePrimaryPress = async () => {
+    if (vehicle.isPrimary || isSettingPrimary || isUpdating) return;
+    setIsUpdating(true);
+    try {
+      if (onSetPrimary) {
+        await onSetPrimary(vehicle);
+      } else {
+        await setPrimaryVehicle(vehicle.id);
+      }
+    } catch {
+      // Gestito dalla schermata padre o silenzioso se già gestito
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${vehicle.brand} ${vehicle.model}, targa ${vehicle.plate}, chilometraggio ${formatMileage(vehicle.mileage)}`}
+      accessibilityLabel={`${vehicle.brand} ${vehicle.model}, targa ${vehicle.plate}, chilometraggio ${formatMileage(vehicle.mileage)}${vehicle.isPrimary ? ', veicolo principale' : ''}`}
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.headerRow}>
-        <View style={styles.iconWrap}>
-          <VehicleIconView icon={vehicle.icon} size={22} color={colors.primary} />
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            vehicle.isPrimary
+              ? `${vehicle.brand} ${vehicle.model} è il tuo veicolo principale`
+              : `Imposta ${vehicle.brand} ${vehicle.model} come veicolo principale`
+          }
+          onPress={handlePrimaryPress}
+          hitSlop={6}
+          style={styles.iconContainer}
+        >
+          <View style={styles.iconWrap}>
+            <VehicleIconView icon={vehicle.icon} size={22} color={colors.primary} />
+          </View>
+          {vehicle.isPrimary ? (
+            <View style={styles.primaryBadgeCorner}>
+              {isUpdating ? (
+                <ActivityIndicator size={10} color="#F59E0B" />
+              ) : (
+                <Star size={10} color="#F59E0B" fill="#F59E0B" strokeWidth={2} />
+              )}
+            </View>
+          ) : isUpdating ? (
+            <View style={styles.primaryBadgeCorner}>
+              <ActivityIndicator size={10} color="#F59E0B" />
+            </View>
+          ) : null}
+        </Pressable>
 
         <View style={styles.vehicleCopy}>
           <Text style={styles.modelName} numberOfLines={1}>
@@ -40,8 +85,10 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, onPress, reco
           </Text>
         </View>
 
-        <View style={styles.plateBadge}>
-          <Text style={styles.plateText}>{vehicle.plate}</Text>
+        <View style={styles.headerRight}>
+          <View style={styles.plateBadge}>
+            <Text style={styles.plateText}>{vehicle.plate}</Text>
+          </View>
         </View>
       </View>
 
@@ -83,6 +130,10 @@ const createStyles = (colors: AppColors) =>
       alignItems: 'center',
       marginBottom: appSpacing.md,
     },
+    iconContainer: {
+      position: 'relative',
+      marginRight: appSpacing.md,
+    },
     iconWrap: {
       width: 46,
       height: 46,
@@ -90,7 +141,20 @@ const createStyles = (colors: AppColors) =>
       backgroundColor: colors.primarySoft,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: appSpacing.md,
+    },
+    primaryBadgeCorner: {
+      position: 'absolute',
+      bottom: -3,
+      right: -3,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.card,
+      borderWidth: 1.5,
+      borderColor: '#F59E0B',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...appShadows.subtle,
     },
     vehicleCopy: {
       flex: 1,
@@ -109,6 +173,10 @@ const createStyles = (colors: AppColors) =>
       fontSize: 12,
       marginTop: 2,
       fontFamily: 'Manrope_500Medium',
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     plateBadge: {
       borderWidth: 1,

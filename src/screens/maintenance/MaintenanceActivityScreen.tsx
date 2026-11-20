@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowRight, Plus, Wrench } from 'lucide-react-native';
+import { ArrowRight, Lock, Plus, Wrench } from 'lucide-react-native';
 import { ActionButton } from '../../components/common/ActionButton';
+import { AppDialog } from '../../components/common/AppDialog';
+import { PrimarySelectionBanner } from '../../components/common/PrimarySelectionBanner';
 import { MaintenanceItem } from '../../components/maintenance/MaintenanceItem';
 import { ScreenShell } from '../../components/common/ScreenShell';
 import { VehicleIconView } from '../../components/vehicle/VehicleIconView';
@@ -10,15 +12,17 @@ import { useApp } from '../../store/AppContext';
 import { AppColors, appRadius, appShadows, appSpacing, appTypography } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
 import { formatCurrency, formatMileage, getRecentMaintenanceRecords } from '../../utils/maintenance';
+import { navigateToPremium } from '../../utils/navigationUtils';
 
 type Props = NativeStackScreenProps<any>;
 
 export const MaintenanceActivityScreen: React.FC<Props> = ({ navigation }) => {
-  const { vehicles, maintenanceRecords } = useApp();
+  const { vehicles, maintenanceRecords, requiresPrimarySelection, canWriteMaintenanceForVehicle } = useApp();
   const colors = useAppColors();
   const styles = createStyles(colors);
   const records = getRecentMaintenanceRecords(maintenanceRecords);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [upgradeDialog, setUpgradeDialog] = useState<boolean>(false);
 
   const visibleRecords = selectedVehicleId
     ? records.filter((record) => record.vehicleId === selectedVehicleId)
@@ -26,8 +30,25 @@ export const MaintenanceActivityScreen: React.FC<Props> = ({ navigation }) => {
 
   const totalSpent = maintenanceRecords.reduce((sum, record) => sum + record.cost, 0);
 
+  const handleVehicleSelect = (vehicleId: string) => {
+    if (requiresPrimarySelection) {
+      navigation.navigate('PrimaryVehicleSelection');
+      return;
+    }
+    if (!canWriteMaintenanceForVehicle(vehicleId)) {
+      setUpgradeDialog(true);
+      return;
+    }
+    navigation.navigate('MaintenanceForm', { vehicleId, mode: 'create' });
+  };
+
   return (
     <ScreenShell>
+      {/* Banner Scelta Veicolo Obbligatoria per Free */}
+      {requiresPrimarySelection ? (
+        <PrimarySelectionBanner onSelectPress={() => navigation.navigate('PrimaryVehicleSelection')} />
+      ) : null}
+
       {/* Intestazione */}
       <View style={styles.headerBlock}>
         <Text style={styles.eyebrow}>IL MIO GARAGE</Text>
@@ -67,33 +88,40 @@ export const MaintenanceActivityScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       ) : (
         <View style={styles.vehiclesGrid}>
-          {vehicles.map((vehicle) => (
-            <Pressable
-              key={vehicle.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Registra intervento per ${vehicle.brand} ${vehicle.model}`}
-              onPress={() => navigation.navigate('MaintenanceForm', { vehicleId: vehicle.id, mode: 'create' })}
-              style={({ pressed }) => [styles.vehicleRow, pressed && styles.vehicleRowPressed]}
-            >
-              <View style={styles.vehicleIcon}>
-                <VehicleIconView icon={vehicle.icon} size={22} color={colors.primary} />
-              </View>
-              <View style={styles.vehicleCopy}>
-                <Text style={styles.vehicleName} numberOfLines={1}>
-                  {vehicle.brand} {vehicle.model}
-                </Text>
-                <View style={styles.vehicleMetaRow}>
-                  <View style={styles.plateTag}>
-                    <Text style={styles.plateTagText}>{vehicle.plate}</Text>
-                  </View>
-                  <Text style={styles.vehicleMileageText}>· {formatMileage(vehicle.mileage)}</Text>
+          {vehicles.map((vehicle) => {
+            const isVehicleWritable = canWriteMaintenanceForVehicle(vehicle.id);
+            return (
+              <Pressable
+                key={vehicle.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Registra intervento per ${vehicle.brand} ${vehicle.model}${!isVehicleWritable ? ', veicolo secondario in sola lettura' : ''}`}
+                onPress={() => handleVehicleSelect(vehicle.id)}
+                style={({ pressed }) => [styles.vehicleRow, pressed && styles.vehicleRowPressed]}
+              >
+                <View style={styles.vehicleIcon}>
+                  <VehicleIconView icon={vehicle.icon} size={22} color={colors.primary} />
                 </View>
-              </View>
-              <View style={styles.addShortcut}>
-                <Plus size={16} color={colors.primary} strokeWidth={2.4} />
-              </View>
-            </Pressable>
-          ))}
+                <View style={styles.vehicleCopy}>
+                  <Text style={styles.vehicleName} numberOfLines={1}>
+                    {vehicle.brand} {vehicle.model}
+                  </Text>
+                  <View style={styles.vehicleMetaRow}>
+                    <View style={styles.plateTag}>
+                      <Text style={styles.plateTagText}>{vehicle.plate}</Text>
+                    </View>
+                    <Text style={styles.vehicleMileageText}>· {formatMileage(vehicle.mileage)}</Text>
+                  </View>
+                </View>
+                <View style={styles.addShortcut}>
+                  {isVehicleWritable ? (
+                    <Plus size={16} color={colors.primary} strokeWidth={2.4} />
+                  ) : (
+                    <Lock size={15} color={colors.muted} strokeWidth={2} />
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       )}
 
@@ -158,6 +186,21 @@ export const MaintenanceActivityScreen: React.FC<Props> = ({ navigation }) => {
           })}
         </View>
       )}
+
+      {/* Upgrade Dialog */}
+      <AppDialog
+        visible={upgradeDialog}
+        title="Veicolo secondario (Piano Free)"
+        message="Nel piano Free puoi registrare nuovi interventi esclusivamente sul tuo veicolo principale. Passa a Premium per gestire senza limitazioni tutti i tuoi veicoli."
+        confirmLabel="Scopri Premium"
+        cancelLabel="Chiudi"
+        tone="info"
+        onConfirm={() => {
+          setUpgradeDialog(false);
+          navigateToPremium(navigation);
+        }}
+        onDismiss={() => setUpgradeDialog(false)}
+      />
     </ScreenShell>
   );
 };

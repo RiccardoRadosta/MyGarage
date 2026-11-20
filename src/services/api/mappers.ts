@@ -1,5 +1,5 @@
-import { MaintenanceRecord, User, Vehicle } from '../../types';
-import { ApiMaintenance, ApiMaintenanceType, ApiUser, ApiVehicle } from './contracts';
+import { MaintenanceRecord, User, UserPlan, Vehicle } from '../../types';
+import { ApiMaintenance, ApiMaintenanceType, ApiUser, ApiUserPlan, ApiVehicle } from './contracts';
 
 const apiTypeByLabel: Record<string, ApiMaintenanceType> = {
   'Cambio olio': 'OIL_CHANGE',
@@ -48,7 +48,22 @@ export const fromApiVehicle = (vehicle: ApiVehicle): Vehicle => ({
   year: vehicle.year,
   plate: vehicle.plate,
   mileage: vehicle.mileage,
+  isPrimary: Boolean(vehicle.isPrimary),
   createdAt: vehicle.createdAt,
+});
+
+export const fromApiUserPlan = (plan: ApiUserPlan): UserPlan => ({
+  tier: plan.tier,
+  isPremium: Boolean(plan.isPremium),
+  origin: plan.origin,
+  grantType: plan.grantType,
+  subscriptionStatus: plan.subscriptionStatus,
+  productId: plan.productId,
+  expiresAt: plan.expiresAt,
+  autoRenewing: Boolean(plan.autoRenewing),
+  isPermanent: Boolean(plan.isPermanent),
+  primaryVehicleId: plan.primaryVehicleId,
+  requiresPrimarySelection: Boolean(plan.requiresPrimarySelection),
 });
 
 export const fromApiMaintenance = (record: ApiMaintenance): MaintenanceRecord => ({

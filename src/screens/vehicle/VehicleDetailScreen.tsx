@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   CalendarRange,
@@ -8,13 +8,16 @@ import {
   FileDown,
   Gauge,
   History,
+  Info,
   PencilLine,
   Plus,
+  Star,
   Trash2,
   Wrench,
 } from 'lucide-react-native';
 import { ActionButton } from '../../components/common/ActionButton';
 import { AppDialog, AppDialogOptions } from '../../components/common/AppDialog';
+import { PrimarySelectionBanner } from '../../components/common/PrimarySelectionBanner';
 import { ScreenShell } from '../../components/common/ScreenShell';
 import { ScreenContextHeader } from '../../components/common/ScreenContextHeader';
 import { MaintenanceItem } from '../../components/maintenance/MaintenanceItem';
@@ -35,18 +38,73 @@ import {
   sharePdfAsync,
   GeneratePdfResult,
 } from '../../services/pdf/pdfExportService';
+import { navigateToPremium } from '../../utils/navigationUtils';
 
 type Props = NativeStackScreenProps<any>;
 
 export const VehicleDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { vehicleId } = route.params ?? {};
-  const { vehicles, maintenanceRecords, deleteVehicle } = useApp();
+  const {
+    vehicles,
+    maintenanceRecords,
+    deleteVehicle,
+    setPrimaryVehicle,
+    isSettingPrimary,
+    requiresPrimarySelection,
+    canWriteVehicle,
+    canDeleteVehicle,
+    canChangePrimaryVehicle,
+    canExportPdf,
+    refreshPlan,
+  } = useApp();
   const colors = useAppColors();
   const styles = createStyles(colors);
-  const [dialog, setDialog] = React.useState<AppDialogOptions | null>(null);
-  const [isExporting, setIsExporting] = React.useState(false);
-  const [exportProgress, setExportProgress] = React.useState<string | null>(null);
+  const [dialog, setDialog] = useState<AppDialogOptions | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState<string | null>(null);
+  const [isSettingPrimaryLocal, setIsSettingPrimaryLocal] = useState(false);
   const vehicle = vehicles.find((item) => item.id === vehicleId);
+
+  const isWritable = vehicle ? canWriteVehicle(vehicle.id) : false;
+
+  const handleSetPrimary = async () => {
+    if (!vehicle || vehicle.isPrimary || isSettingPrimary || isSettingPrimaryLocal) return;
+
+    if (!canChangePrimaryVehicle) {
+      setDialog({
+        tone: 'info',
+        title: 'Funzionalità Premium',
+        message:
+          'Nel piano Free il veicolo principale non può essere modificato. Passa a Premium per gestire veicoli multipli e cambiare il veicolo principale in qualsiasi momento.',
+        confirmLabel: 'Scopri Premium',
+        cancelLabel: 'Chiudi',
+        onConfirm: () => {
+          setDialog(null);
+          navigateToPremium(navigation);
+        },
+      });
+      return;
+    }
+
+    setIsSettingPrimaryLocal(true);
+    try {
+      await setPrimaryVehicle(vehicle.id);
+    } catch (err: any) {
+      void refreshPlan();
+      const code = err?.response?.data?.code || err?.code;
+      if (code === 'PRIMARY_VEHICLE_SELECTION_REQUIRED') {
+        navigation.navigate('PrimaryVehicleSelection');
+        return;
+      }
+      setDialog({
+        tone: 'danger',
+        title: 'Operazione non riuscita',
+        message: err?.message || 'Impossibile impostare il veicolo come principale. Riprova tra poco.',
+      });
+    } finally {
+      setIsSettingPrimaryLocal(false);
+    }
+  };
 
   if (!vehicle) {
     return (
@@ -167,16 +225,34 @@ export const VehicleDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleExportPdf = async () => {
     if (isExporting || !vehicle) return;
 
+    if (!canExportPdf) {
+      setDialog({
+        tone: 'info',
+        title: 'Funzionalità Premium',
+        message:
+          'L’esportazione dello storico del veicolo in formato PDF è riservata agli utenti Premium. Passa a Premium per scaricare e stampare report completi.',
+        confirmLabel: 'Scopri Premium',
+        cancelLabel: 'Chiudi',
+        onConfirm: () => {
+          setDialog(null);
+          navigateToPremium(navigation);
+        },
+      });
+      return;
+    }
+
     if (records.length === 0) {
       setDialog({
         tone: 'info',
         title: 'Nessuna manutenzione',
         message: 'Non ci sono ancora manutenzioni da esportare. Registra il primo intervento per generare il PDF.',
-        confirmLabel: 'Aggiungi manutenzione',
+        confirmLabel: isWritable ? 'Aggiungi manutenzione' : undefined,
         cancelLabel: 'Chiudi',
-        onConfirm: () => {
-          navigation.navigate('MaintenanceForm', { vehicleId: vehicle.id, mode: 'create' });
-        },
+        onConfirm: isWritable
+          ? () => {
+              navigation.navigate('MaintenanceForm', { vehicleId: vehicle.id, mode: 'create' });
+            }
+          : undefined,
       });
       return;
     }
@@ -217,6 +293,21 @@ export const VehicleDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleDeleteVehicle = () => {
+    if (!canDeleteVehicle) {
+      setDialog({
+        tone: 'info',
+        title: 'Funzionalità Premium',
+        message:
+          'Nel piano Free non è consentita l’eliminazione dei veicoli. Passa a Premium per gestire ed eliminare i tuoi veicoli liberamente.',
+        confirmLabel: 'Scopri Premium',
+        cancelLabel: 'Chiudi',
+        onConfirm: () => {
+          setDialog(null);
+          navigateToPremium(navigation);
+        },
+      });
+      return;
+    }
     setDialog({
       tone: 'danger',
       title: 'Elimina veicolo',
@@ -228,15 +319,58 @@ export const VehicleDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <ScreenShell>
+      {/* Banner Scelta Veicolo Obbligatoria per Free */}
+      {requiresPrimarySelection ? (
+        <PrimarySelectionBanner onSelectPress={() => navigation.navigate('PrimaryVehicleSelection')} />
+      ) : null}
+
       {/* Intestazione di navigazione */}
       <ScreenContextHeader label="SCHEDA VEICOLO" onBack={() => navigation.goBack()} />
+
+      {/* Avviso Veicolo Secondario in sola consultazione */}
+      {!isWritable && !requiresPrimarySelection ? (
+        <View style={styles.secondaryNoticeCard}>
+          <View style={styles.secondaryNoticeIconWrap}>
+            <Info size={16} color={colors.primary} />
+          </View>
+          <Text style={styles.secondaryNoticeText}>
+            Veicolo secondario (Piano Free) — In sola consultazione. Le modifiche ai dati e la registrazione di nuovi interventi sono consentite solo sul veicolo principale.
+          </Text>
+        </View>
+      ) : null}
 
       {/* 1. Hero Card: Identità del Veicolo */}
       <View style={styles.heroCard}>
         <View style={styles.heroTopRow}>
-          <View style={styles.heroIconWrap}>
-            <VehicleIconView icon={vehicle.icon} size={28} color={colors.primary} strokeWidth={2} />
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              vehicle.isPrimary
+                ? `${vehicle.brand} ${vehicle.model} è il tuo veicolo principale`
+                : `Imposta ${vehicle.brand} ${vehicle.model} come veicolo principale`
+            }
+            onPress={handleSetPrimary}
+            hitSlop={6}
+            style={styles.heroIconContainer}
+          >
+            <View style={styles.heroIconWrap}>
+              <VehicleIconView icon={vehicle.icon} size={28} color={colors.primary} strokeWidth={2} />
+            </View>
+            {vehicle.isPrimary ? (
+              <View style={styles.heroPrimaryBadgeCorner}>
+                {isSettingPrimaryLocal ? (
+                  <ActivityIndicator size={11} color="#F59E0B" />
+                ) : (
+                  <Star size={11} color="#F59E0B" fill="#F59E0B" strokeWidth={2} />
+                )}
+              </View>
+            ) : isSettingPrimaryLocal ? (
+              <View style={styles.heroPrimaryBadgeCorner}>
+                <ActivityIndicator size={11} color="#F59E0B" />
+              </View>
+            ) : null}
+          </Pressable>
+
           <View style={styles.heroCopy}>
             <Text style={styles.heroTitle} numberOfLines={2}>
               {vehicle.brand} {vehicle.model}
@@ -250,8 +384,10 @@ export const VehicleDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.heroDivider} />
 
         <View style={styles.heroBottomRow}>
-          <View style={styles.plateBadge}>
-            <Text style={styles.plateText}>{vehicle.plate || 'SENZA TARGA'}</Text>
+          <View style={styles.heroBottomLeft}>
+            <View style={styles.plateBadge}>
+              <Text style={styles.plateText}>{vehicle.plate || 'SENZA TARGA'}</Text>
+            </View>
           </View>
           <View style={styles.heroMileageSnippet}>
             <Gauge size={15} color={colors.primary} strokeWidth={2.2} />
@@ -291,34 +427,36 @@ export const VehicleDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </View>
 
-      {/* 3. Gerarchia delle Azioni: Primaria + Azioni Secondarie Affiancate */}
-      <View style={styles.actionsBlock}>
-        <ActionButton
-          title="Aggiungi manutenzione"
-          icon={<Plus size={18} color={colors.white} strokeWidth={2.4} />}
-          onPress={() => navigation.navigate('MaintenanceForm', { vehicleId: vehicle.id, mode: 'create' })}
-          style={styles.primaryActionButton}
-        />
+      {/* 3. Gerarchia delle Azioni: Primaria + Azioni Secondarie Affiancate (solo se veicolo scrivibile) */}
+      {isWritable ? (
+        <View style={styles.actionsBlock}>
+          <ActionButton
+            title="Aggiungi manutenzione"
+            icon={<Plus size={18} color={colors.white} strokeWidth={2.4} />}
+            onPress={() => navigation.navigate('MaintenanceForm', { vehicleId: vehicle.id, mode: 'create' })}
+            style={styles.primaryActionButton}
+          />
 
-        <View style={styles.secondaryActionsRow}>
-          <View style={styles.secondaryActionCol}>
-            <ActionButton
-              title="Aggiorna km"
-              variant="secondary"
-              icon={<Gauge size={15} color={colors.primary} strokeWidth={2} />}
-              onPress={() => navigation.navigate('VehicleForm', { mode: 'mileage', vehicleId: vehicle.id })}
-            />
-          </View>
-          <View style={styles.secondaryActionCol}>
-            <ActionButton
-              title="Modifica veicolo"
-              variant="secondary"
-              icon={<PencilLine size={15} color={colors.primary} strokeWidth={2} />}
-              onPress={() => navigation.navigate('VehicleForm', { mode: 'edit', vehicleId: vehicle.id })}
-            />
+          <View style={styles.secondaryActionsRow}>
+            <View style={styles.secondaryActionCol}>
+              <ActionButton
+                title="Aggiorna km"
+                variant="secondary"
+                icon={<Gauge size={15} color={colors.primary} strokeWidth={2} />}
+                onPress={() => navigation.navigate('VehicleForm', { mode: 'mileage', vehicleId: vehicle.id })}
+              />
+            </View>
+            <View style={styles.secondaryActionCol}>
+              <ActionButton
+                title="Modifica veicolo"
+                variant="secondary"
+                icon={<PencilLine size={15} color={colors.primary} strokeWidth={2} />}
+                onPress={() => navigation.navigate('VehicleForm', { mode: 'edit', vehicleId: vehicle.id })}
+              />
+            </View>
           </View>
         </View>
-      </View>
+      ) : null}
 
       {/* 4. Attività Recenti */}
       <View style={styles.sectionHeader}>
@@ -362,15 +500,19 @@ export const VehicleDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
           <Text style={styles.emptyTitle}>Nessun intervento registrato</Text>
           <Text style={styles.emptySubtitle}>
-            Registra il primo tagliando, cambio olio o spesa per iniziare a costruire lo storico di questo veicolo.
+            {isWritable
+              ? 'Registra il primo tagliando, cambio olio o spesa per iniziare a costruire lo storico di questo veicolo.'
+              : 'Nessuna manutenzione registrata per questo veicolo secondario.'}
           </Text>
-          <ActionButton
-            title="Registra primo intervento"
-            size="compact"
-            icon={<Plus size={15} color={colors.white} strokeWidth={2.4} />}
-            onPress={() => navigation.navigate('MaintenanceForm', { vehicleId: vehicle.id, mode: 'create' })}
-            style={styles.emptyButton}
-          />
+          {isWritable ? (
+            <ActionButton
+              title="Registra primo intervento"
+              size="compact"
+              icon={<Plus size={15} color={colors.white} strokeWidth={2.4} />}
+              onPress={() => navigation.navigate('MaintenanceForm', { vehicleId: vehicle.id, mode: 'create' })}
+              style={styles.emptyButton}
+            />
+          ) : null}
         </View>
       )}
 
@@ -445,6 +587,32 @@ export const VehicleDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const createStyles = (colors: AppColors) =>
   StyleSheet.create({
+    secondaryNoticeCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: appSpacing.sm,
+      backgroundColor: colors.primarySoft,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: appRadius.md,
+      padding: appSpacing.md,
+      marginBottom: appSpacing.md,
+    },
+    secondaryNoticeIconWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: appRadius.sm,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    secondaryNoticeText: {
+      flex: 1,
+      ...appTypography.caption,
+      color: colors.text,
+      fontSize: 12.5,
+      lineHeight: 17,
+    },
     title: {
       ...appTypography.title,
       color: colors.text,
@@ -465,6 +633,10 @@ const createStyles = (colors: AppColors) =>
       flexDirection: 'row',
       alignItems: 'center',
     },
+    heroIconContainer: {
+      position: 'relative',
+      marginRight: appSpacing.md,
+    },
     heroIconWrap: {
       width: 56,
       height: 56,
@@ -472,7 +644,20 @@ const createStyles = (colors: AppColors) =>
       backgroundColor: colors.primarySoft,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: appSpacing.md,
+    },
+    heroPrimaryBadgeCorner: {
+      position: 'absolute',
+      bottom: -3,
+      right: -3,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: colors.card,
+      borderWidth: 1.5,
+      borderColor: '#F59E0B',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...appShadows.subtle,
     },
     heroCopy: {
       flex: 1,
@@ -501,6 +686,11 @@ const createStyles = (colors: AppColors) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: appSpacing.xs,
+    },
+    heroBottomLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
     },
     plateBadge: {
       backgroundColor: colors.background,

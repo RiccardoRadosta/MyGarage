@@ -1,7 +1,20 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ChevronRight, Info, LogOut, Moon, UserRound } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import {
+  CarFront,
+  CheckCircle2,
+  ChevronRight,
+  Crown,
+  FileDown,
+  Info,
+  LogOut,
+  Moon,
+  Paperclip,
+  Sparkles,
+  UserRound,
+} from 'lucide-react-native';
 import { ScreenShell } from '../../components/common/ScreenShell';
 import { ActionButton } from '../../components/common/ActionButton';
 import { AppDialog } from '../../components/common/AppDialog';
@@ -12,11 +25,18 @@ import { useAppColors, useThemePreference } from '../../theme/ThemeContext';
 type Props = NativeStackScreenProps<any>;
 
 export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
-  const { user, logout } = useApp();
+  const { user, logout, plan, refreshPlan } = useApp();
   const colors = useAppColors();
   const styles = createStyles(colors);
   const { isDarkMode, setDarkMode } = useThemePreference();
   const [isLogoutDialogVisible, setIsLogoutDialogVisible] = useState(false);
+
+  // Sincronizza lo stato effettivo del piano ogni volta che il Profilo entra in primo piano
+  useFocusEffect(
+    useCallback(() => {
+      void refreshPlan();
+    }, [refreshPlan]),
+  );
 
   const handleLogout = () => {
     setIsLogoutDialogVisible(false);
@@ -24,6 +44,14 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const userInitial = user?.name?.trim() ? user.name.trim().charAt(0).toUpperCase() : null;
+  const isPremiumActive = Boolean(plan?.isPremium);
+  const planLabel = plan
+    ? plan.grantType === 'DEVELOPER'
+      ? 'Developer'
+      : plan.isPremium
+        ? 'Premium'
+        : 'Free'
+    : 'Attivo';
 
   return (
     <ScreenShell>
@@ -51,14 +79,123 @@ export const ProfileScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.userName} numberOfLines={1}>
               {user?.name ?? 'Utente'}
             </Text>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>Attivo</Text>
+            <View style={[styles.statusBadge, isPremiumActive ? styles.premiumBadge : styles.freeBadge]}>
+              <Text style={[styles.statusBadgeText, isPremiumActive ? styles.premiumBadgeText : styles.freeBadgeText]}>
+                {planLabel}
+              </Text>
             </View>
           </View>
           <Text style={styles.userEmail} numberOfLines={1}>
             {user?.email ?? 'email@example.com'}
           </Text>
         </View>
+      </View>
+
+      {/* Sezione Piano & Vantaggi Premium */}
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionTitle}>IL TUO PIANO</Text>
+
+        {isPremiumActive ? (
+          <View style={styles.premiumActiveCard}>
+            <View style={styles.premiumActiveHeader}>
+              <View style={styles.crownIconWrap}>
+                <Crown size={20} color="#F59E0B" strokeWidth={2.2} />
+              </View>
+              <View style={styles.premiumActiveTitleWrap}>
+                <Text style={styles.premiumActiveTitle}>
+                  {plan?.grantType === 'DEVELOPER' ? 'Account Developer Abilitato' : 'MyGarage Premium Attivo'}
+                </Text>
+                <Text style={styles.premiumActiveSubtitle}>
+                  Tutte le funzionalità esclusive sono sbloccate per il tuo account.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.featureListActive}>
+              <View style={styles.featureItem}>
+                <CheckCircle2 size={15} color={colors.success} strokeWidth={2.4} />
+                <Text style={styles.featureItemText}>Veicoli multipli illimitati nel garage</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <CheckCircle2 size={15} color={colors.success} strokeWidth={2.4} />
+                <Text style={styles.featureItemText}>Caricamento ricevute e fatture PDF o foto</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <CheckCircle2 size={15} color={colors.success} strokeWidth={2.4} />
+                <Text style={styles.featureItemText}>Esportazione dello storico manutenzioni in PDF</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <CheckCircle2 size={15} color={colors.success} strokeWidth={2.4} />
+                <Text style={styles.featureItemText}>Cambio del veicolo principale sempre consentito</Text>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.premiumPromoCard}>
+            <View style={styles.premiumPromoHeader}>
+              <View style={styles.crownIconWrap}>
+                <Crown size={22} color="#F59E0B" strokeWidth={2.2} />
+              </View>
+              <View style={styles.premiumPromoTitleWrap}>
+                <Text style={styles.premiumPromoEyebrow}>FUNZIONALITÀ ESCLUSIVE</Text>
+                <Text style={styles.premiumPromoTitle}>Vantaggi MyGarage Premium</Text>
+              </View>
+            </View>
+
+            <Text style={styles.premiumPromoDesc}>
+              Passando a Premium potrai superare i limiti del piano Free e gestire il tuo garage al massimo livello:
+            </Text>
+
+            <View style={styles.promoFeaturesList}>
+              <View style={styles.promoFeatureRow}>
+                <View style={styles.promoFeatureIcon}>
+                  <CarFront size={16} color="#F59E0B" strokeWidth={2.2} />
+                </View>
+                <View style={styles.promoFeatureContent}>
+                  <Text style={styles.promoFeatureTitle}>Veicoli multipli illimitati</Text>
+                  <Text style={styles.promoFeatureDesc}>Aggiungi tutte le auto, moto e furgoni che desideri.</Text>
+                </View>
+              </View>
+
+              <View style={styles.promoFeatureRow}>
+                <View style={styles.promoFeatureIcon}>
+                  <Paperclip size={16} color="#F59E0B" strokeWidth={2.2} />
+                </View>
+                <View style={styles.promoFeatureContent}>
+                  <Text style={styles.promoFeatureTitle}>Ricevute, fatture e libretti</Text>
+                  <Text style={styles.promoFeatureDesc}>Allega documenti PDF e fotografie ad ogni intervento.</Text>
+                </View>
+              </View>
+
+              <View style={styles.promoFeatureRow}>
+                <View style={styles.promoFeatureIcon}>
+                  <FileDown size={16} color="#F59E0B" strokeWidth={2.2} />
+                </View>
+                <View style={styles.promoFeatureContent}>
+                  <Text style={styles.promoFeatureTitle}>Esportazione report PDF</Text>
+                  <Text style={styles.promoFeatureDesc}>Scarica o stampa il fascicolo cronologico del veicolo.</Text>
+                </View>
+              </View>
+
+              <View style={styles.promoFeatureRow}>
+                <View style={styles.promoFeatureIcon}>
+                  <Sparkles size={16} color="#F59E0B" strokeWidth={2.2} />
+                </View>
+                <View style={styles.promoFeatureContent}>
+                  <Text style={styles.promoFeatureTitle}>Gestione completa e libera</Text>
+                  <Text style={styles.promoFeatureDesc}>Cambia o elimina veicoli in ogni momento senza restrizioni.</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.playBillingNotice}>
+              <Info size={14} color={colors.muted} strokeWidth={2} />
+              <Text style={styles.playBillingNoticeText}>
+                Gli abbonamenti in-app saranno attivabili con il prossimo aggiornamento su Google Play Store.
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Sezione Impostazioni */}
@@ -237,6 +374,18 @@ const createStyles = (colors: AppColors) =>
       fontWeight: '700',
       fontFamily: 'Manrope_700Bold',
     },
+    premiumBadge: {
+      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    },
+    premiumBadgeText: {
+      color: '#D97706',
+    },
+    freeBadge: {
+      backgroundColor: `${colors.primary}18`,
+    },
+    freeBadgeText: {
+      color: colors.primary,
+    },
     userEmail: {
       color: colors.muted,
       fontSize: 13,
@@ -320,5 +469,153 @@ const createStyles = (colors: AppColors) =>
     logoutBlock: {
       marginTop: appSpacing.md,
       marginBottom: appSpacing.xl,
+    },
+    /* Card Piano Premium Attivo */
+    premiumActiveCard: {
+      backgroundColor: colors.card,
+      borderRadius: appRadius.lg,
+      borderWidth: 1.5,
+      borderColor: 'rgba(245, 158, 11, 0.35)',
+      padding: appSpacing.md,
+      ...appShadows.subtle,
+    },
+    premiumActiveHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: appSpacing.sm,
+      marginBottom: appSpacing.sm,
+    },
+    crownIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: appRadius.md,
+      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    premiumActiveTitleWrap: {
+      flex: 1,
+    },
+    premiumActiveTitle: {
+      ...appTypography.heading,
+      fontSize: 16,
+      fontWeight: '800',
+      fontFamily: 'Manrope_800ExtraBold',
+      color: colors.text,
+    },
+    premiumActiveSubtitle: {
+      ...appTypography.caption,
+      color: colors.muted,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    featureListActive: {
+      gap: 6,
+      marginTop: appSpacing.xs,
+      paddingTop: appSpacing.xs,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    featureItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    featureItemText: {
+      ...appTypography.body,
+      fontSize: 13,
+      color: colors.text,
+      fontFamily: 'Manrope_600SemiBold',
+    },
+
+    /* Card Promo Premium per Utenti Free */
+    premiumPromoCard: {
+      backgroundColor: colors.card,
+      borderRadius: appRadius.lg,
+      borderWidth: 1.5,
+      borderColor: '#F59E0B',
+      padding: appSpacing.md,
+      ...appShadows.card,
+    },
+    premiumPromoHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: appSpacing.sm,
+      marginBottom: appSpacing.xs,
+    },
+    premiumPromoTitleWrap: {
+      flex: 1,
+    },
+    premiumPromoEyebrow: {
+      ...appTypography.eyebrow,
+      color: '#D97706',
+      fontSize: 10,
+      letterSpacing: 1.1,
+    },
+    premiumPromoTitle: {
+      ...appTypography.title,
+      fontSize: 18,
+      fontWeight: '800',
+      fontFamily: 'Manrope_800ExtraBold',
+      color: colors.text,
+    },
+    premiumPromoDesc: {
+      ...appTypography.body,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.muted,
+      marginVertical: appSpacing.xs,
+    },
+    promoFeaturesList: {
+      gap: appSpacing.sm,
+      marginVertical: appSpacing.xs,
+    },
+    promoFeatureRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: appSpacing.sm,
+    },
+    promoFeatureIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: appRadius.xs,
+      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 2,
+    },
+    promoFeatureContent: {
+      flex: 1,
+    },
+    promoFeatureTitle: {
+      ...appTypography.body,
+      fontSize: 13,
+      fontWeight: '700',
+      fontFamily: 'Manrope_700Bold',
+      color: colors.text,
+    },
+    promoFeatureDesc: {
+      ...appTypography.caption,
+      fontSize: 12,
+      color: colors.muted,
+      lineHeight: 16,
+      marginTop: 1,
+    },
+    playBillingNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: appSpacing.sm,
+      paddingTop: appSpacing.xs,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    playBillingNoticeText: {
+      ...appTypography.caption,
+      flex: 1,
+      fontSize: 11.5,
+      color: colors.muted,
+      fontStyle: 'italic',
+      lineHeight: 15,
     },
   });

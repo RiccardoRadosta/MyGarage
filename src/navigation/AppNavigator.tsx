@@ -26,6 +26,7 @@ import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { ProfileEditScreen } from '../screens/profile/ProfileEditScreen';
 import { VehicleDetailScreen } from '../screens/vehicle/VehicleDetailScreen';
 import { VehicleFormScreen } from '../screens/vehicle/VehicleFormScreen';
+import { PrimaryVehicleSelectionScreen } from '../screens/vehicle/PrimaryVehicleSelectionScreen';
 import { MaintenanceFormScreen } from '../screens/maintenance/MaintenanceFormScreen';
 import { MaintenanceDetailScreen } from '../screens/maintenance/MaintenanceDetailScreen';
 import { MaintenanceHistoryScreen } from '../screens/maintenance/MaintenanceHistoryScreen';
@@ -162,6 +163,7 @@ export const AppNavigator = () => {
         ) : (
           <>
             <RootStack.Screen name="MainTabs" component={MainTabs} />
+            <RootStack.Screen name="PrimaryVehicleSelection" component={PrimaryVehicleSelectionScreen} />
             <RootStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
             <RootStack.Screen name="VehicleDetail" component={VehicleDetailScreen} />
             <RootStack.Screen name="VehicleForm" component={VehicleFormScreen} />

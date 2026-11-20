@@ -45,6 +45,7 @@ import {
   pickPdfAttachment,
 } from '../../utils/attachmentUtils';
 import { formatMileage } from '../../utils/maintenance';
+import { navigateToPremium } from '../../utils/navigationUtils';
 
 type Props = NativeStackScreenProps<any>;
 
@@ -99,12 +100,24 @@ const isValidDateValue = (value: string) => {
 
 export const MaintenanceFormScreen: React.FC<Props> = ({ navigation, route }) => {
   const { vehicleId, maintenanceId, mode } = route.params ?? {};
-  const { vehicles, maintenanceRecords, addMaintenance, updateMaintenance, logout, setMaintenanceAttachmentState } = useApp();
+  const {
+    vehicles,
+    maintenanceRecords,
+    addMaintenance,
+    updateMaintenance,
+    logout,
+    setMaintenanceAttachmentState,
+    requiresPrimarySelection,
+    canWriteMaintenanceForVehicle,
+    canManageAttachments,
+    refreshPlan,
+  } = useApp();
   const colors = useAppColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const existing = maintenanceRecords.find((item) => item.id === maintenanceId);
   const vehiclesById = vehicles.find((vehicle) => vehicle.id === vehicleId);
+  const targetVehicleId = vehicleId || existing?.vehicleId;
   const existingIsCustom = !!existing && !maintenanceOptions.some((option) => option.label === existing.type);
 
   const [type, setType] = useState(existingIsCustom ? 'Altro' : existing?.type ?? 'Cambio olio');
@@ -121,6 +134,31 @@ export const MaintenanceFormScreen: React.FC<Props> = ({ navigation, route }) =>
   const [picking, setPicking] = useState(false);
   const [dialog, setDialog] = useState<AppDialogOptions | null>(null);
   const [errors, setErrors] = useState<{ type?: string; date?: string; mileage?: string; cost?: string; notes?: string; customDescription?: string }>({});
+
+  useEffect(() => {
+    if (requiresPrimarySelection) {
+      navigation.navigate('PrimaryVehicleSelection');
+      return;
+    }
+
+    if (targetVehicleId && !canWriteMaintenanceForVehicle(targetVehicleId)) {
+      setDialog({
+        tone: 'info',
+        title: 'Veicolo in sola lettura',
+        message:
+          'Nel piano Free non è consentito aggiungere o modificare interventi su un veicolo secondario.',
+        confirmLabel: 'Torna indietro',
+        onConfirm: () => {
+          setDialog(null);
+          navigation.goBack();
+        },
+        onDismiss: () => {
+          setDialog(null);
+          navigation.goBack();
+        },
+      });
+    }
+  }, [requiresPrimarySelection, targetVehicleId, canWriteMaintenanceForVehicle]);
 
   const savingRef = useRef(false);
   const attachmentUploadRef = useRef<(() => Promise<boolean>) | null>(null);
@@ -160,6 +198,20 @@ export const MaintenanceFormScreen: React.FC<Props> = ({ navigation, route }) =>
 
   const handlePickPending = async (source: 'camera' | 'library' | 'pdf') => {
     if (picking || saving) return;
+    if (!canManageAttachments) {
+      setDialog({
+        tone: 'info',
+        title: 'Funzionalità Premium',
+        message: 'Il caricamento di ricevute e documenti di spesa è riservato agli utenti Premium.',
+        confirmLabel: 'Scopri Premium',
+        cancelLabel: 'Chiudi',
+        onConfirm: () => {
+          setDialog(null);
+          navigateToPremium(navigation);
+        },
+      });
+      return;
+    }
     setPicking(true);
     try {
       const picked = source === 'pdf'
@@ -183,6 +235,27 @@ export const MaintenanceFormScreen: React.FC<Props> = ({ navigation, route }) =>
 
   const handleSave = async () => {
     if (savingRef.current) return;
+
+    if (requiresPrimarySelection) {
+      navigation.navigate('PrimaryVehicleSelection');
+      return;
+    }
+
+    if (targetVehicleId && !canWriteMaintenanceForVehicle(targetVehicleId)) {
+      setDialog({
+        tone: 'info',
+        title: 'Veicolo in sola lettura',
+        message:
+          'Nel piano Free non è consentito aggiungere o modificare interventi su un veicolo secondario.',
+        confirmLabel: 'Torna indietro',
+        onConfirm: () => {
+          setDialog(null);
+          navigation.goBack();
+        },
+      });
+      return;
+    }
+
     const nextErrors: typeof errors = {};
     const numericCost = Number(cost.trim().replace(',', '.'));
     if (!type.trim()) nextErrors.type = 'Seleziona un tipo di manutenzione.';
@@ -264,6 +337,35 @@ export const MaintenanceFormScreen: React.FC<Props> = ({ navigation, route }) =>
 
       navigation.goBack();
     } catch (error) {
+      if (error instanceof ApiError && error.code === 'PRIMARY_VEHICLE_SELECTION_REQUIRED') {
+        void refreshPlan();
+        setDialog({
+          tone: 'info',
+          title: 'Scelta obbligatoria',
+          message: 'È necessario selezionare prima il veicolo principale.',
+          confirmLabel: 'Seleziona veicolo',
+          onConfirm: () => {
+            setDialog(null);
+            navigation.navigate('PrimaryVehicleSelection');
+          },
+        });
+        return;
+      }
+      if (error instanceof ApiError && error.code === 'UPGRADE_REQUIRED') {
+        void refreshPlan();
+        setDialog({
+          tone: 'info',
+          title: 'Funzionalità Premium',
+          message: error.message || 'Questa operazione richiede un piano Premium.',
+          confirmLabel: 'Scopri Premium',
+          cancelLabel: 'Chiudi',
+          onConfirm: () => {
+            setDialog(null);
+            navigateToPremium(navigation);
+          },
+        });
+        return;
+      }
       if (maintenanceSaved && pendingAttachment) {
         if (error instanceof ApiError && error.status === 401) void logout();
         setDialog({
@@ -518,7 +620,30 @@ export const MaintenanceFormScreen: React.FC<Props> = ({ navigation, route }) =>
           Allega copia del documento di spesa (PDF o JPEG, max 5 MB).
         </Text>
 
-        {mode === 'edit' && existing ? (
+        {!canManageAttachments ? (
+          mode === 'edit' && existing?.hasAttachment ? (
+            <AttachmentSection
+              maintenanceId={existing.id}
+              hasAttachmentInitial={existing.hasAttachment}
+              readOnly
+            />
+          ) : (
+            <View style={styles.premiumAttachmentCard}>
+              <View style={styles.premiumAttachmentIconWrap}>
+                <FileText size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.premiumAttachmentText}>
+                Il caricamento di ricevute e fatture PDF o foto è una funzionalità riservata agli utenti Premium.
+              </Text>
+              <ActionButton
+                title="Scopri Premium"
+                variant="secondary"
+                size="compact"
+                onPress={() => navigateToPremium(navigation)}
+              />
+            </View>
+          )
+        ) : mode === 'edit' && existing ? (
           <AttachmentSection
             maintenanceId={existing.id}
             hasAttachmentInitial={existing.hasAttachment}
@@ -691,7 +816,11 @@ export const MaintenanceFormScreen: React.FC<Props> = ({ navigation, route }) =>
         confirmLabel={dialog?.confirmLabel}
         cancelLabel={dialog?.cancelLabel}
         onConfirm={dialog?.onConfirm}
-        onDismiss={() => setDialog(null)}
+        onDismiss={() => {
+          const dismissCb = dialog?.onDismiss;
+          setDialog(null);
+          dismissCb?.();
+        }}
       />
 
       {/* Bottom Sheet Selezione Tipologia Intervento */}
@@ -1333,5 +1462,30 @@ const createStyles = (colors: AppColors) =>
     },
     cancelBtn: {
       marginTop: 0,
+    },
+    premiumAttachmentCard: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: appRadius.md,
+      padding: appSpacing.md,
+      alignItems: 'center',
+      gap: appSpacing.sm,
+      marginVertical: appSpacing.xs,
+    },
+    premiumAttachmentIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: appRadius.full,
+      backgroundColor: colors.primarySoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    premiumAttachmentText: {
+      ...appTypography.body,
+      color: colors.muted,
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 18,
     },
   });

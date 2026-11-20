@@ -1,23 +1,92 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CarFront, Plus } from 'lucide-react-native';
 import { ScreenShell } from '../../components/common/ScreenShell';
 import { ActionButton } from '../../components/common/ActionButton';
+import { AppDialog } from '../../components/common/AppDialog';
+import { PrimarySelectionBanner } from '../../components/common/PrimarySelectionBanner';
 import { VehicleCard } from '../../components/vehicle/VehicleCard';
 import { useApp } from '../../store/AppContext';
 import { AppColors, appRadius, appShadows, appSpacing, appTypography } from '../../theme/theme';
 import { useAppColors } from '../../theme/ThemeContext';
+import { navigateToPremium } from '../../utils/navigationUtils';
+import { Vehicle } from '../../types';
 
 type Props = NativeStackScreenProps<any>;
 
 export const GarageScreen: React.FC<Props> = ({ navigation }) => {
-  const { vehicles, maintenanceRecords } = useApp();
+  const {
+    vehicles,
+    maintenanceRecords,
+    setPrimaryVehicle,
+    requiresPrimarySelection,
+    canAddVehicle,
+    canChangePrimaryVehicle,
+    refreshPlan,
+  } = useApp();
   const colors = useAppColors();
   const styles = createStyles(colors);
+  const [errorDialog, setErrorDialog] = useState<string | null>(null);
+  const [upgradeDialog, setUpgradeDialog] = useState<{ visible: boolean; title: string; message: string }>({
+    visible: false,
+    title: '',
+    message: '',
+  });
+
+  const handleAddVehiclePress = () => {
+    if (requiresPrimarySelection) {
+      navigation.navigate('PrimaryVehicleSelection');
+      return;
+    }
+    if (!canAddVehicle) {
+      setUpgradeDialog({
+        visible: true,
+        title: 'Limite Piano Free',
+        message:
+          'Il piano Free consente di gestire un solo veicolo. Per aggiungere altri veicoli al tuo garage, passa a un piano Premium.',
+      });
+      return;
+    }
+    navigation.navigate('VehicleForm', { mode: 'create' });
+  };
+
+  const handleSetPrimary = async (vehicle: Vehicle) => {
+    if (vehicle.isPrimary) return;
+
+    if (!canChangePrimaryVehicle) {
+      setUpgradeDialog({
+        visible: true,
+        title: 'Funzionalità Premium',
+        message:
+          'Nel piano Free il veicolo principale non può essere modificato. Passa a Premium per gestire veicoli multipli e cambiare veicolo principale in ogni momento.',
+      });
+      return;
+    }
+
+    try {
+      await setPrimaryVehicle(vehicle.id);
+    } catch (err: any) {
+      const code = err?.response?.data?.code || err?.code;
+      if (code === 'PRIMARY_VEHICLE_SELECTION_REQUIRED') {
+        void refreshPlan();
+        navigation.navigate('PrimaryVehicleSelection');
+        return;
+      }
+      if (code === 'UPGRADE_REQUIRED') {
+        void refreshPlan();
+      }
+      setErrorDialog(err?.message || 'Impossibile impostare il veicolo come principale. Riprova tra poco.');
+    }
+  };
 
   return (
     <ScreenShell>
+      {/* Banner Scelta Veicolo Obbligatoria per Free */}
+      {requiresPrimarySelection ? (
+        <PrimarySelectionBanner onSelectPress={() => navigation.navigate('PrimaryVehicleSelection')} />
+      ) : null}
+
       {/* Intestazione */}
       <View style={styles.headerBlock}>
         <Text style={styles.eyebrow}>IL MIO GARAGE</Text>
@@ -34,7 +103,7 @@ export const GarageScreen: React.FC<Props> = ({ navigation }) => {
             title="Aggiungi"
             size="compact"
             icon={<Plus size={14} color={colors.white} strokeWidth={2.4} />}
-            onPress={() => navigation.navigate('VehicleForm', { mode: 'create' })}
+            onPress={handleAddVehiclePress}
           />
         </View>
         <Text style={styles.subtitle}>
@@ -63,7 +132,7 @@ export const GarageScreen: React.FC<Props> = ({ navigation }) => {
           <ActionButton
             title="Aggiungi il primo veicolo"
             icon={<Plus size={16} color={colors.white} strokeWidth={2.4} />}
-            onPress={() => navigation.navigate('VehicleForm', { mode: 'create' })}
+            onPress={handleAddVehiclePress}
           />
         </View>
       ) : (
@@ -74,10 +143,35 @@ export const GarageScreen: React.FC<Props> = ({ navigation }) => {
               vehicle={vehicle}
               records={maintenanceRecords}
               onPress={() => navigation.navigate('VehicleDetail', { vehicleId: vehicle.id })}
+              onSetPrimary={handleSetPrimary}
             />
           ))}
         </View>
       )}
+
+      {/* Dialog di errore */}
+      <AppDialog
+        visible={errorDialog !== null}
+        title="Operazione non riuscita"
+        message={errorDialog ?? ''}
+        tone="danger"
+        onDismiss={() => setErrorDialog(null)}
+      />
+
+      {/* Upgrade / Info Dialog */}
+      <AppDialog
+        visible={upgradeDialog.visible}
+        title={upgradeDialog.title}
+        message={upgradeDialog.message}
+        confirmLabel="Scopri Premium"
+        cancelLabel="Chiudi"
+        tone="info"
+        onConfirm={() => {
+          setUpgradeDialog((prev) => ({ ...prev, visible: false }));
+          navigateToPremium(navigation);
+        }}
+        onDismiss={() => setUpgradeDialog((prev) => ({ ...prev, visible: false }))}
+      />
     </ScreenShell>
   );
 };

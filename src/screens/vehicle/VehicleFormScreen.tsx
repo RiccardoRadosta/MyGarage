@@ -21,6 +21,7 @@ import { AppColors, appRadius, appShadows, appSpacing, appTypography } from '../
 import { useAppColors } from '../../theme/ThemeContext';
 import { VehicleIconId } from '../../types';
 import { formatMileage } from '../../utils/maintenance';
+import { navigateToPremium } from '../../utils/navigationUtils';
 
 type Props = NativeStackScreenProps<any>;
 
@@ -35,7 +36,7 @@ export const getCanonicalPlate = (value: string): string => {
 };
 
 export const VehicleFormScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { addVehicle, updateVehicle, vehicles } = useApp();
+  const { addVehicle, updateVehicle, vehicles, requiresPrimarySelection, canAddVehicle, canWriteVehicle, refreshPlan } = useApp();
   const colors = useAppColors();
   const styles = createStyles(colors);
 
@@ -67,6 +68,54 @@ export const VehicleFormScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const isMileageMode = mode === 'mileage';
   const isDetailsMode = mode === 'edit';
+
+  useEffect(() => {
+    if (requiresPrimarySelection) {
+      navigation.navigate('PrimaryVehicleSelection');
+      return;
+    }
+
+    if (mode === 'create' && !canAddVehicle) {
+      setDialog({
+        tone: 'info',
+        title: 'Limite Piano Free',
+        message:
+          'Il piano Free consente di gestire un solo veicolo. Per aggiungere altri veicoli al tuo garage, passa al piano Premium.',
+        confirmLabel: 'Scopri Premium',
+        cancelLabel: 'Torna indietro',
+        onConfirm: () => {
+          setDialog(null);
+          navigateToPremium(navigation);
+        },
+        onCancel: () => {
+          setDialog(null);
+          navigation.goBack();
+        },
+        onDismiss: () => {
+          setDialog(null);
+        },
+      });
+      return;
+    }
+
+    if ((mode === 'edit' || mode === 'mileage') && vehicle && !canWriteVehicle(vehicle.id)) {
+      setDialog({
+        tone: 'info',
+        title: 'Veicolo in sola lettura',
+        message:
+          'Nel piano Free non è consentito modificare i dati o il chilometraggio di un veicolo secondario.',
+        confirmLabel: 'Torna indietro',
+        onConfirm: () => {
+          setDialog(null);
+          navigation.goBack();
+        },
+        onDismiss: () => {
+          setDialog(null);
+          navigation.goBack();
+        },
+      });
+    }
+  }, [requiresPrimarySelection, mode, canAddVehicle, vehicle, canWriteVehicle]);
 
   const screenTitle = isMileageMode
     ? 'Aggiorna chilometraggio'
@@ -117,6 +166,42 @@ export const VehicleFormScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleSave = async () => {
+    if (requiresPrimarySelection) {
+      navigation.navigate('PrimaryVehicleSelection');
+      return;
+    }
+
+    if (mode === 'create' && !canAddVehicle) {
+      setDialog({
+        tone: 'info',
+        title: 'Limite Piano Free',
+        message:
+          'Il piano Free consente di gestire un solo veicolo. Per aggiungere altri veicoli al tuo garage, passa al piano Premium.',
+        confirmLabel: 'Scopri Premium',
+        cancelLabel: 'Chiudi',
+        onConfirm: () => {
+          setDialog(null);
+          navigateToPremium(navigation);
+        },
+      });
+      return;
+    }
+
+    if ((mode === 'edit' || mode === 'mileage') && vehicle && !canWriteVehicle(vehicle.id)) {
+      setDialog({
+        tone: 'info',
+        title: 'Veicolo in sola lettura',
+        message:
+          'Nel piano Free non è consentito modificare i dati o il chilometraggio di un veicolo secondario.',
+        confirmLabel: 'Torna indietro',
+        onConfirm: () => {
+          setDialog(null);
+          navigation.goBack();
+        },
+      });
+      return;
+    }
+
     if (mode !== 'create' && !vehicle) {
       setDialog({
         title: 'Veicolo non trovato',
@@ -235,6 +320,36 @@ export const VehicleFormScreen: React.FC<Props> = ({ navigation, route }) => {
         let message = 'Riprova tra poco.';
 
         if (error instanceof ApiError) {
+          if (error.code === 'PRIMARY_VEHICLE_SELECTION_REQUIRED') {
+            void refreshPlan();
+            setDialog({
+              tone: 'info',
+              title: 'Scelta obbligatoria',
+              message: 'È necessario selezionare prima il veicolo principale.',
+              confirmLabel: 'Seleziona veicolo',
+              onConfirm: () => {
+                setDialog(null);
+                navigation.navigate('PrimaryVehicleSelection');
+              },
+            });
+            return;
+          }
+          if (error.code === 'UPGRADE_REQUIRED') {
+            void refreshPlan();
+            setDialog({
+              tone: 'info',
+              title: 'Funzionalità Premium',
+              message: error.message || 'Questa operazione richiede un piano Premium.',
+              confirmLabel: 'Scopri Premium',
+              cancelLabel: 'Chiudi',
+              onConfirm: () => {
+                setDialog(null);
+                navigateToPremium(navigation);
+              },
+            });
+            return;
+          }
+
           const isDuplicatePlate =
             error.status === 409 ||
             error.code === 'DUPLICATE_PLATE' ||
@@ -704,7 +819,12 @@ export const VehicleFormScreen: React.FC<Props> = ({ navigation, route }) => {
         confirmLabel={dialog?.confirmLabel}
         cancelLabel={dialog?.cancelLabel}
         onConfirm={dialog?.onConfirm}
-        onDismiss={() => setDialog(null)}
+        onCancel={dialog?.onCancel}
+        onDismiss={() => {
+          const dismissCb = dialog?.onDismiss;
+          setDialog(null);
+          dismissCb?.();
+        }}
       />
     </ScreenShell>
   );

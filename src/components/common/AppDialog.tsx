@@ -12,6 +12,8 @@ export type AppDialogOptions = {
   cancelLabel?: string;
   tone?: 'error' | 'danger' | 'info' | 'success';
   onConfirm?: () => void;
+  onCancel?: () => void;
+  onDismiss?: () => void;
   secondaryLabel?: string;
   onSecondary?: () => void;
   showCloseButton?: boolean;
@@ -31,6 +33,7 @@ export const AppDialog: React.FC<AppDialogProps> = ({
   tone = 'error',
   onDismiss,
   onConfirm,
+  onCancel,
   secondaryLabel,
   onSecondary,
   showCloseButton = true,
@@ -44,19 +47,24 @@ export const AppDialog: React.FC<AppDialogProps> = ({
     onConfirm?.();
   };
 
+  const handleCancel = () => {
+    onDismiss();
+    onCancel?.();
+  };
+
   return (
     <Modal
       animationType="fade"
       transparent
       visible={visible}
-      onRequestClose={onDismiss}
+      onRequestClose={handleCancel}
       statusBarTranslucent
     >
       <View style={styles.backdrop}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Chiudi finestra"
-          onPress={onDismiss}
+          onPress={handleCancel}
           style={StyleSheet.absoluteFill}
         />
         <View accessibilityRole="alert" style={styles.card}>
@@ -64,7 +72,7 @@ export const AppDialog: React.FC<AppDialogProps> = ({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Chiudi finestra"
-              onPress={onDismiss}
+              onPress={handleCancel}
               style={styles.closeButton}
               hitSlop={14}
             >
@@ -99,7 +107,7 @@ export const AppDialog: React.FC<AppDialogProps> = ({
                   <ActionButton
                     title={cancelLabel}
                     variant="secondary"
-                    onPress={onDismiss}
+                    onPress={handleCancel}
                     style={styles.fullWidthAction}
                   />
                 ) : null}
@@ -109,7 +117,7 @@ export const AppDialog: React.FC<AppDialogProps> = ({
                 <ActionButton
                   title={cancelLabel ?? 'Annulla'}
                   variant="secondary"
-                  onPress={onDismiss}
+                  onPress={handleCancel}
                   style={styles.actionButton}
                 />
                 <ActionButton
@@ -123,7 +131,7 @@ export const AppDialog: React.FC<AppDialogProps> = ({
               <ActionButton
                 title={confirmLabel}
                 variant={tone === 'danger' ? 'danger' : 'primary'}
-                onPress={onDismiss}
+                onPress={handleCancel}
                 style={styles.singleAction}
               />
             )}

@@ -1,9 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { MaintenanceRecord, User, Vehicle } from '../types';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
+import { MaintenanceRecord, SubscriptionTier, User, UserPlan, Vehicle } from '../types';
 import { ApiCostsSummary } from '../services/api/contracts';
 import { ApiError, apiClient } from '../services/api/ApiClient';
 import { authApi, costsApi, maintenancesApi, usersApi, vehiclesApi } from '../services/api/api';
-import { fromApiMaintenance, fromApiUser, fromApiVehicle, toApiMaintenancePayload } from '../services/api/mappers';
+import { fromApiMaintenance, fromApiUser, fromApiUserPlan, fromApiVehicle, toApiMaintenancePayload } from '../services/api/mappers';
 import { signOutGoogle } from '../services/googleAuth';
 
 const INITIAL_USER: User = {
@@ -13,9 +14,23 @@ const INITIAL_USER: User = {
 };
 
 const INITIAL_VEHICLES: Vehicle[] = [
-  { id: 'v-1', icon: 'carFront', brand: 'BMW', model: 'Serie 1', year: 2021, plate: 'AB123CD', mileage: 68420, createdAt: '2023-01-18' },
-  { id: 'v-2', icon: 'car', brand: 'Mercedes', model: 'A 180', year: 2019, plate: 'CD456EF', mileage: 93120, createdAt: '2022-06-20' },
+  { id: 'v-1', icon: 'carFront', brand: 'BMW', model: 'Serie 1', year: 2021, plate: 'AB123CD', mileage: 68420, isPrimary: true, createdAt: '2023-01-18' },
+  { id: 'v-2', icon: 'car', brand: 'Mercedes', model: 'A 180', year: 2019, plate: 'CD456EF', mileage: 93120, isPrimary: false, createdAt: '2022-06-20' },
 ];
+
+const INITIAL_PLAN: UserPlan = {
+  tier: 'FREE',
+  isPremium: false,
+  origin: 'FREE_TIER',
+  grantType: null,
+  subscriptionStatus: null,
+  productId: null,
+  expiresAt: null,
+  autoRenewing: false,
+  isPermanent: false,
+  primaryVehicleId: 'v-1',
+  requiresPrimarySelection: false,
+};
 
 const INITIAL_RECORDS: MaintenanceRecord[] = [
   { id: 'm-1', vehicleId: 'v-1', type: 'Cambio olio', date: '2025-05-18', mileage: 62000, cost: 89, notes: 'Cambio olio sintetico e filtro oleo.' },
@@ -31,6 +46,21 @@ type AppContextType = {
   vehicles: Vehicle[];
   maintenanceRecords: MaintenanceRecord[];
   costSummary: ApiCostsSummary | null;
+  plan: UserPlan | null;
+  tier: SubscriptionTier | undefined;
+  isPremium: boolean;
+  primaryVehicleId: string | null;
+  requiresPrimarySelection: boolean;
+  canAddVehicle: boolean;
+  canDeleteVehicle: boolean;
+  canChangePrimaryVehicle: boolean;
+  canWriteVehicle: (vehicleId: string) => boolean;
+  canWriteMaintenanceForVehicle: (vehicleId: string) => boolean;
+  canManageAttachments: boolean;
+  canExportPdf: boolean;
+  setPrimaryVehicle: (vehicleId: string) => Promise<void>;
+  isSettingPrimary: boolean;
+  refreshPlan: () => Promise<void>;
   login: (email: string, password: string) => Promise<boolean>;
   loginWithGoogle: (idToken: string) => Promise<boolean>;
   register: (name: string, email: string, password: string, confirmPassword: string) => Promise<boolean>;
@@ -56,17 +86,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [vehicles, setVehicles] = useState<Vehicle[]>(INITIAL_VEHICLES);
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(INITIAL_RECORDS);
   const [costSummary, setCostSummary] = useState<ApiCostsSummary | null>(null);
+  const [plan, setPlan] = useState<UserPlan | null>(apiClient.isConfigured ? null : INITIAL_PLAN);
+  const [isSettingPrimary, setIsSettingPrimary] = useState(false);
   const [welcomePending, setWelcomePending] = useState(false);
+
+  // Identificativo univoco della sessione attiva per proteggere gli aggiornamenti asincroni da logout e cambi account
+  const activeSessionKeyRef = useRef<string | null>(null);
+
+  const startSession = useCallback((userId: string) => {
+    activeSessionKeyRef.current = `${userId}_${Date.now()}_${Math.random()}`;
+  }, []);
+
+  const endSession = useCallback(() => {
+    activeSessionKeyRef.current = null;
+  }, []);
 
   const dismissWelcome = useCallback(() => {
     setWelcomePending(false);
   }, []);
 
   const loadRemoteData = async () => {
-    const [remoteVehicles, firstMaintenancePage, remoteCostSummary] = await Promise.all([
+    const [remoteVehicles, firstMaintenancePage, remoteCostSummary, remotePlan] = await Promise.all([
       vehiclesApi.list(),
       maintenancesApi.list({ page: 0, size: 100 }),
       costsApi.summary(),
+      usersApi.plan().catch((err) => {
+        console.warn('Failed to fetch user plan:', err);
+        return null;
+      }),
     ]);
 
     const maintenancePages = await Promise.all(
@@ -75,12 +122,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ),
     );
 
+    const planData = remotePlan ? fromApiUserPlan(remotePlan) : null;
+    const mappedVehicles = remoteVehicles.map(fromApiVehicle);
+    const vehiclesWithPrimary = planData?.primaryVehicleId
+      ? mappedVehicles.map((v) => ({
+          ...v,
+          isPrimary: v.id === planData.primaryVehicleId || Boolean(v.isPrimary),
+        }))
+      : mappedVehicles;
+
     return {
-      vehicles: remoteVehicles.map(fromApiVehicle),
+      vehicles: vehiclesWithPrimary,
       maintenanceRecords: [firstMaintenancePage, ...maintenancePages]
         .flatMap((page) => page.items)
         .map(fromApiMaintenance),
       costSummary: remoteCostSummary,
+      plan: planData,
     };
   };
 
@@ -88,6 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setVehicles(data.vehicles);
     setMaintenanceRecords(data.maintenanceRecords);
     setCostSummary(data.costSummary);
+    setPlan(data.plan);
   };
 
   useEffect(() => {
@@ -99,7 +157,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const remoteUser = await usersApi.me();
         const data = await loadRemoteData();
         if (!cancelled) {
-          setUser(fromApiUser(remoteUser));
+          const mappedUser = fromApiUser(remoteUser);
+          startSession(mappedUser.id);
+          setUser(mappedUser);
           applyRemoteData(data);
           setIsAuthenticated(true);
         }
@@ -127,12 +187,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (apiClient.isConfigured) {
       const result = await authApi.login(email.trim(), password);
       const data = await loadRemoteData();
-      setUser(fromApiUser(result.user));
+      const mappedUser = fromApiUser(result.user);
+      startSession(mappedUser.id);
+      setUser(mappedUser);
       applyRemoteData(data);
       setIsAuthenticated(true);
       return true;
     }
 
+    startSession('u-1');
     setUser({
       id: 'u-1',
       name: 'Marco',
@@ -151,7 +214,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const result = await authApi.googleLogin(idToken.trim());
         const data = await loadRemoteData();
-        setUser(fromApiUser(result.user));
+        const mappedUser = fromApiUser(result.user);
+        startSession(mappedUser.id);
+        setUser(mappedUser);
         applyRemoteData(data);
         setIsAuthenticated(true);
         return true;
@@ -174,13 +239,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (apiClient.isConfigured) {
       const result = await authApi.register(name.trim(), email.trim(), password);
       const data = await loadRemoteData();
-      setUser(fromApiUser(result.user));
+      const mappedUser = fromApiUser(result.user);
+      startSession(mappedUser.id);
+      setUser(mappedUser);
       applyRemoteData(data);
       setWelcomePending(true);
       setIsAuthenticated(true);
       return true;
     }
 
+    startSession('u-2');
     setUser({
       id: 'u-2',
       name: name.trim(),
@@ -192,6 +260,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = async () => {
+    endSession();
     if (apiClient.isConfigured) {
       try {
         await authApi.logout();
@@ -203,6 +272,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setWelcomePending(false);
     setIsAuthenticated(false);
     setUser(null);
+    setPlan(null);
+    setVehicles([]);
+    setMaintenanceRecords([]);
+    setCostSummary(null);
   };
 
   const updateProfile = async (name: string, email: string) => {
@@ -253,10 +326,143 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (apiClient.isConfigured) await vehiclesApi.delete(vehicleId);
     setVehicles((current) => current.filter((vehicle) => vehicle.id !== vehicleId));
     setMaintenanceRecords((current) => current.filter((record) => record.vehicleId !== vehicleId));
+    setPlan((current) =>
+      current && current.primaryVehicleId === vehicleId
+        ? { ...current, primaryVehicleId: null }
+        : current,
+    );
     if (apiClient.isConfigured) {
       void costsApi.summary().then(setCostSummary).catch(() => setCostSummary(null));
     }
   };
+
+  const setPrimaryVehicle = async (vehicleId: string) => {
+    if (isSettingPrimary) return;
+
+    const target = vehicles.find((v) => v.id === vehicleId);
+    if (!plan?.requiresPrimarySelection && (target?.isPrimary || plan?.primaryVehicleId === vehicleId)) {
+      return;
+    }
+
+    const requestSessionKey = activeSessionKeyRef.current;
+    setIsSettingPrimary(true);
+    try {
+      if (apiClient.isConfigured) {
+        await vehiclesApi.setPrimary(vehicleId);
+        if (activeSessionKeyRef.current !== requestSessionKey) return;
+        setVehicles((current) =>
+          current.map((v) => ({
+            ...v,
+            isPrimary: v.id === vehicleId,
+          })),
+        );
+        try {
+          const remotePlan = await usersApi.plan();
+          if (activeSessionKeyRef.current !== requestSessionKey) return;
+          setPlan(fromApiUserPlan(remotePlan));
+        } catch {
+          if (activeSessionKeyRef.current !== requestSessionKey) return;
+          setPlan((current) =>
+            current
+              ? { ...current, primaryVehicleId: vehicleId, requiresPrimarySelection: false }
+              : {
+                  tier: 'FREE',
+                  isPremium: false,
+                  origin: 'FREE_TIER',
+                  grantType: null,
+                  subscriptionStatus: null,
+                  productId: null,
+                  expiresAt: null,
+                  autoRenewing: false,
+                  isPermanent: false,
+                  primaryVehicleId: vehicleId,
+                  requiresPrimarySelection: false,
+                },
+          );
+        }
+        return;
+      }
+
+      setVehicles((current) =>
+        current.map((v) => ({
+          ...v,
+          isPrimary: v.id === vehicleId,
+        })),
+      );
+      setPlan((current) => (current ? { ...current, primaryVehicleId: vehicleId, requiresPrimarySelection: false } : null));
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsSettingPrimary(false);
+    }
+  };
+
+  const refreshPlan = useCallback(async () => {
+    if (!apiClient.isConfigured) return;
+    const requestSessionKey = activeSessionKeyRef.current;
+    if (!requestSessionKey) return;
+
+    try {
+      const remotePlan = await usersApi.plan();
+      if (activeSessionKeyRef.current !== requestSessionKey) {
+        return;
+      }
+      const mapped = fromApiUserPlan(remotePlan);
+      setPlan(mapped);
+      if (mapped.primaryVehicleId) {
+        setVehicles((current) =>
+          current.map((v) => ({
+            ...v,
+            isPrimary: v.id === mapped.primaryVehicleId,
+          })),
+        );
+      }
+    } catch (error) {
+      console.warn('Failed to refresh plan:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!apiClient.isConfigured) return undefined;
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && isAuthenticated) {
+        void refreshPlan();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isAuthenticated, refreshPlan]);
+
+  const requiresPrimarySelection = Boolean(plan?.requiresPrimarySelection);
+  const isPremium = Boolean(plan?.isPremium);
+  const primaryVehicleId = plan?.primaryVehicleId ?? null;
+
+  const canAddVehicle = (isPremium || vehicles.length === 0) && !requiresPrimarySelection;
+  const canDeleteVehicle = isPremium && !requiresPrimarySelection;
+  const canChangePrimaryVehicle = isPremium || requiresPrimarySelection;
+  const canManageAttachments = isPremium && !requiresPrimarySelection;
+  const canExportPdf = isPremium && !requiresPrimarySelection;
+
+  const canWriteVehicle = useCallback(
+    (vehicleId: string) => {
+      if (requiresPrimarySelection) return false;
+      if (isPremium) return true;
+      return vehicleId === primaryVehicleId;
+    },
+    [requiresPrimarySelection, isPremium, primaryVehicleId],
+  );
+
+  const canWriteMaintenanceForVehicle = useCallback(
+    (vehicleId: string) => {
+      if (requiresPrimarySelection) return false;
+      if (isPremium) return true;
+      return vehicleId === primaryVehicleId;
+    },
+    [requiresPrimarySelection, isPremium, primaryVehicleId],
+  );
 
   const addMaintenance = async (record: Omit<MaintenanceRecord, 'id'>) => {
     if (apiClient.isConfigured) {
@@ -354,6 +560,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       vehicles,
       maintenanceRecords,
       costSummary,
+      plan,
+      tier: plan?.tier,
+      isPremium,
+      primaryVehicleId,
+      requiresPrimarySelection,
+      canAddVehicle,
+      canDeleteVehicle,
+      canChangePrimaryVehicle,
+      canWriteVehicle,
+      canWriteMaintenanceForVehicle,
+      canManageAttachments,
+      canExportPdf,
+      setPrimaryVehicle,
+      isSettingPrimary,
+      refreshPlan,
       login,
       loginWithGoogle,
       register,
@@ -369,7 +590,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       welcomePending,
       dismissWelcome,
     }),
-    [user, isAuthenticated, isInitializing, vehicles, maintenanceRecords, costSummary, setMaintenanceAttachmentState, welcomePending, dismissWelcome],
+    [
+      user,
+      isAuthenticated,
+      isInitializing,
+      vehicles,
+      maintenanceRecords,
+      costSummary,
+      plan,
+      isPremium,
+      primaryVehicleId,
+      requiresPrimarySelection,
+      canAddVehicle,
+      canDeleteVehicle,
+      canChangePrimaryVehicle,
+      canWriteVehicle,
+      canWriteMaintenanceForVehicle,
+      canManageAttachments,
+      canExportPdf,
+      isSettingPrimary,
+      refreshPlan,
+      setMaintenanceAttachmentState,
+      welcomePending,
+      dismissWelcome,
+    ],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

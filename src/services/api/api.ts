@@ -10,6 +10,7 @@ import {
   ApiRefreshTokens,
   ApiTokens,
   ApiUser,
+  ApiUserPlan,
   ApiVehicle,
   ApiVehicleSummary,
   CreateMaintenanceRequest,
@@ -103,6 +104,7 @@ export const authApi = {
 
 export const usersApi = {
   me: () => apiClient.request<ApiUser>('/api/v1/users/me'),
+  plan: () => apiClient.request<ApiUserPlan>('/api/v1/users/me/plan'),
   updateMe: (payload: Partial<Pick<ApiUser, 'name' | 'email'>>) =>
     apiClient.request<ApiUser>('/api/v1/users/me', { method: 'PATCH', body: jsonBody(payload) }),
 };
@@ -121,6 +123,10 @@ export const vehiclesApi = {
   update: (vehicleId: string, payload: UpdateVehicleRequest) => apiClient.request<ApiVehicle>(
     `/api/v1/vehicles/${encodeURIComponent(vehicleId)}`,
     { method: 'PATCH', body: jsonBody(payload) },
+  ),
+  setPrimary: (vehicleId: string) => apiClient.request<ApiVehicle>(
+    `/api/v1/vehicles/${encodeURIComponent(vehicleId)}/set-primary`,
+    { method: 'PUT' },
   ),
   delete: (vehicleId: string) => apiClient.request<void>(
     `/api/v1/vehicles/${encodeURIComponent(vehicleId)}`,

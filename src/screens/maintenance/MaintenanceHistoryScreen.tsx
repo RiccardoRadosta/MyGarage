@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { CircleDollarSign, Plus, Wrench } from 'lucide-react-native';
+import { CircleDollarSign, Info, Plus, Wrench } from 'lucide-react-native';
 import { ScreenShell } from '../../components/common/ScreenShell';
 import { ActionButton } from '../../components/common/ActionButton';
 import { ScreenContextHeader } from '../../components/common/ScreenContextHeader';
@@ -16,11 +16,12 @@ type Props = NativeStackScreenProps<any>;
 
 export const MaintenanceHistoryScreen: React.FC<Props> = ({ navigation, route }) => {
   const { vehicleId } = route.params ?? {};
-  const { vehicles, maintenanceRecords } = useApp();
+  const { vehicles, maintenanceRecords, canWriteMaintenanceForVehicle } = useApp();
   const colors = useAppColors();
   const styles = createStyles(colors);
 
   const vehicle = vehicles.find((v) => v.id === vehicleId);
+  const isWritable = vehicle ? canWriteMaintenanceForVehicle(vehicle.id) : false;
   const records = [...maintenanceRecords]
     .filter((record) => record.vehicleId === vehicleId)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -31,6 +32,18 @@ export const MaintenanceHistoryScreen: React.FC<Props> = ({ navigation, route })
     <ScreenShell>
       {/* Intestazione di contesto */}
       <ScreenContextHeader label="STORICO VEICOLO" onBack={() => navigation.goBack()} />
+
+      {/* Avviso Veicolo Secondario in sola consultazione */}
+      {!isWritable ? (
+        <View style={styles.readOnlyNotice}>
+          <View style={styles.readOnlyNoticeIconWrap}>
+            <Info size={16} color={colors.primary} />
+          </View>
+          <Text style={styles.readOnlyNoticeText}>
+            Veicolo secondario (Piano Free) — Lo storico è in sola consultazione. Nuovi interventi possono essere registrati esclusivamente sul veicolo principale.
+          </Text>
+        </View>
+      ) : null}
 
       {/* 1. Hero Card: Identità Veicolo */}
       {vehicle ? (
@@ -93,8 +106,8 @@ export const MaintenanceHistoryScreen: React.FC<Props> = ({ navigation, route })
         </View>
       </View>
 
-      {/* 3. Pulsante Principale: Nuovo Intervento (visibile solo se ci sono già record, per non duplicare la CTA dello stato vuoto) */}
-      {records.length > 0 ? (
+      {/* 3. Pulsante Principale: Nuovo Intervento (solo se scrivibile) */}
+      {records.length > 0 && isWritable ? (
         <ActionButton
           title="Nuovo intervento"
           icon={<Plus size={18} color={colors.white} strokeWidth={2.4} />}
@@ -124,15 +137,19 @@ export const MaintenanceHistoryScreen: React.FC<Props> = ({ navigation, route })
           </View>
           <Text style={styles.emptyTitle}>Nessun intervento registrato</Text>
           <Text style={styles.emptySubtitle}>
-            Non sono ancora presenti interventi per questo veicolo. Registra il primo tagliando o spesa per iniziare a monitorare lo storico.
+            {isWritable
+              ? 'Non sono ancora presenti interventi per questo veicolo. Registra il primo tagliando o spesa per iniziare a monitorare lo storico.'
+              : 'Nessun intervento registrato per questo veicolo secondario.'}
           </Text>
-          <ActionButton
-            title="Aggiungi il primo intervento"
-            size="compact"
-            icon={<Plus size={15} color={colors.white} strokeWidth={2.4} />}
-            onPress={() => navigation.navigate('MaintenanceForm', { vehicleId, mode: 'create' })}
-            style={styles.emptyActionButton}
-          />
+          {isWritable ? (
+            <ActionButton
+              title="Aggiungi il primo intervento"
+              size="compact"
+              icon={<Plus size={15} color={colors.white} strokeWidth={2.4} />}
+              onPress={() => navigation.navigate('MaintenanceForm', { vehicleId, mode: 'create' })}
+              style={styles.emptyActionButton}
+            />
+          ) : null}
         </View>
       ) : (
         <View style={styles.recordsList}>
@@ -151,6 +168,32 @@ export const MaintenanceHistoryScreen: React.FC<Props> = ({ navigation, route })
 
 const createStyles = (colors: AppColors) =>
   StyleSheet.create({
+    readOnlyNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: appSpacing.sm,
+      backgroundColor: colors.primarySoft,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: appRadius.md,
+      padding: appSpacing.md,
+      marginBottom: appSpacing.md,
+    },
+    readOnlyNoticeIconWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: appRadius.sm,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    readOnlyNoticeText: {
+      flex: 1,
+      ...appTypography.caption,
+      color: colors.text,
+      fontSize: 12.5,
+      lineHeight: 17,
+    },
     title: {
       ...appTypography.title,
       color: colors.text,
